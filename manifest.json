@@ -1,0 +1,16 @@
+{
+  "name": "家庭回憶錄",
+  "short_name": "家庭回憶錄",
+  "description": "每天問長輩一個問題，把故事、照片和聲音留下來，排成一本可以列印的書",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#dde8df",
+  "theme_color": "#2f6b5e",
+  "lang": "zh-TW",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
