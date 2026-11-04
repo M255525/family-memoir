@@ -465,42 +465,71 @@ function renderChaps(){
 
 /* ================= 備份 ================= */
 function refsOf(b){ var a = []; b.memories.forEach(function(m){ a = a.concat(m.photos || [], m.audio || []); }); return a.filter(function(v, i, s){ return s.indexOf(v) === i; }); }
+function backupName(label){ var d = new Date(); return label.replace(/[\\/:*?"<>|]/g, '') + '-備份-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '.json'; }
+function packMedia(list){
+  var media = {}, ids = [];
+  list.forEach(function(b){ refsOf(b).forEach(function(id){ if(ids.indexOf(id) < 0) ids.push(id); }); });
+  return Promise.all(ids.map(function(id){ return getMedia(id).then(function(bl){ if(!bl) return; return b2d(bl).then(function(u){ media[id] = u; }); }); })).then(function(){ return media; });
+}
 function packBook(){
-  var b = book(), media = {}, d = new Date();
-  return Promise.all(refsOf(b).map(function(id){ return getMedia(id).then(function(bl){ if(!bl) return; return b2d(bl).then(function(u){ media[id] = u; }); }); })).then(function(){
-    return {book:b, blob:new Blob([JSON.stringify({app:'family-memoir', v:1, book:b, media:media})], {type:'application/json'}), name:(b.title || '回憶錄').replace(/[\\/:*?"<>|]/g, '') + '-備份-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '.json'};
+  var b = book();
+  return packMedia([b]).then(function(media){
+    return {books:[b], blob:new Blob([JSON.stringify({app:'family-memoir', v:1, book:b, media:media})], {type:'application/json'}), name:backupName(b.title || '回憶錄')};
   });
 }
-function markBackup(b){ set.lastExport[b.id] = Date.now(); saveSet(); renderSettings(); }
-function exportBook(){
+function packAll(){
+  return packMedia(S.books).then(function(media){
+    return {books:S.books.slice(), blob:new Blob([JSON.stringify({app:'family-memoir', v:2, books:S.books, media:media})], {type:'application/json'}), name:backupName('家庭回憶錄全部' + S.books.length + '本')};
+  });
+}
+function markBackup(list){ list.forEach(function(b){ set.lastExport[b.id] = Date.now(); }); saveSet(); renderSettings(); }
+function saveBackup(pack, done){
   toast('正在打包，照片多時要等一下');
-  packBook().then(function(p){
+  pack().then(function(p){
     var a = document.createElement('a'); a.href = URL.createObjectURL(p.blob); a.download = p.name;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
-    markBackup(p.book); toast('已匯出備份檔');
-  });
+    markBackup(p.books); toast(done);
+  }).catch(function(){ toast('匯出失敗，檔案可能太大，請改成一本一本匯出'); });
 }
+function exportBook(){ saveBackup(packBook, '已匯出這本書的 JSON 檔'); }
+function exportAll(){ saveBackup(packAll, '已匯出全部 ' + S.books.length + ' 本書的 JSON 檔'); }
 function canShareFile(){ try{ return !!(navigator.canShare && navigator.canShare({files:[new File(['x'], 'x.json', {type:'application/json'})]})); }catch(e){ return false; } }
 function shareBook(){
   toast('正在打包，照片多時要等一下');
   packBook().then(function(p){
     var f = new File([p.blob], p.name, {type:'application/json'});
-    return navigator.share({files:[f], title:p.name}).then(function(){ markBackup(p.book); toast('已傳出備份檔'); });
-  }).catch(function(e){ if(!e || e.name !== 'AbortError') toast('這台裝置傳不出去，請改用「匯出這本書」'); });
+    return navigator.share({files:[f], title:p.name}).then(function(){ markBackup(p.books); toast('已傳出備份檔'); });
+  }).catch(function(e){ if(!e || e.name !== 'AbortError') toast('這台裝置傳不出去，請改用「匯出這本書（JSON）」'); });
 }
 function mergeList(oldL, newL){ var ix = {}; oldL.forEach(function(x){ ix[x.id] = x; }); var c = 0; newL.forEach(function(x){ var o = ix[x.id]; if(!o){ oldL.push(x); c++; } else if((x.updatedAt || 0) > (o.updatedAt || 0)){ Object.keys(x).forEach(function(k){ o[k] = x[k]; }); c++; } }); return c; }
+function backupBooks(d){
+  if(!d || d.app !== 'family-memoir') return null;
+  var list = Array.isArray(d.books) ? d.books : d.book ? [d.book] : [];
+  var media = d.media || {}, mediaOk = Object.keys(media).every(function(id){ return typeof media[id] === 'string' && media[id].indexOf('data:') === 0 && media[id].indexOf(',') > 0; });
+  return mediaOk && list.length && list.every(function(b){ return b && b.id && Array.isArray(b.memories); }) ? list : null;
+}
+function blankBook(b){ return b.title === '我們家的回憶錄' && !b.memories.length && !b.people.length && !b.subject && !b.birth && !b.editor && !b.dedication && !b.afterword; }
 function importFile(f){
   var r = new FileReader();
   r.onerror = function(){ toast('讀不到這個檔案'); };
   r.onload = function(){
     var d; try{ d = JSON.parse(r.result); }catch(e){ d = null; }
-    if(!d || d.app !== 'family-memoir' || !d.book || !d.book.id || !Array.isArray(d.book.memories)){ toast('這不是家庭回憶錄的備份檔'); return; }
-    Promise.all(Object.keys(d.media || {}).map(function(id){ return putMedia(id, d2b(d.media[id])); })).then(function(){
-      var have = S.books.filter(function(b){ return b.id === d.book.id; })[0], msg;
-      if(have){ norm(have); var c = mergeList(have.memories, d.book.memories || []); mergeList(have.people, d.book.people || []); msg = '已合併，更新 ' + c + ' 段回憶'; S.cur = have.id; }
-      else { S.books.push(norm(d.book)); S.cur = d.book.id; msg = '已匯入《' + d.book.title + '》'; }
-      save(); renderAll(); toast(msg);
-    }).catch(function(){ toast('匯入失敗，裝置空間可能不足'); });
+    var list = backupBooks(d);
+    if(!list){ toast('這不是家庭回憶錄的 JSON 檔'); return; }
+    var media = d.media || {};
+    Promise.all(Object.keys(media).map(function(id){ return Promise.resolve().then(function(){ return putMedia(id, d2b(media[id])); }); })).then(function(){
+      var added = 0, merged = 0, updated = 0, last = null;
+      S.books = S.books.filter(function(b){ return !blankBook(b) || list.some(function(x){ return x.id === b.id; }); });
+      list.forEach(function(nb){
+        var have = S.books.filter(function(b){ return b.id === nb.id; })[0];
+        if(have){ norm(have); updated += mergeList(have.memories, nb.memories); mergeList(have.people, nb.people || []); merged++; last = have; }
+        else { S.books.push(norm(nb)); added++; last = nb; }
+      });
+      if(list.length === 1 || !book()) S.cur = last.id;
+      save(); renderAll(); renderSettings();
+      if(list.length === 1) toast(added ? '已匯入《' + last.title + '》' : '已合併，更新 ' + updated + ' 段回憶');
+      else toast('已匯入 ' + list.length + ' 本：新增 ' + added + ' 本、合併 ' + merged + ' 本');
+    }).catch(function(){ toast('匯入失敗，檔案內容有誤或裝置空間不足'); });
   };
   r.readAsText(f);
 }
@@ -601,7 +630,9 @@ function bind(){
     if(tab === 'book' && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) && !document.querySelector('.modal.show')){ if(e.key === 'ArrowLeft') turn(set.dir === 'v' ? 1 : -1); if(e.key === 'ArrowRight') turn(set.dir === 'v' ? -1 : 1); }
   });
   $('bookSel').onchange = function(){ S.cur = this.value; save(); renderAll(); };
-  $('openSet').onclick = function(){ renderSettings(); restoreFold(); $('settings').classList.add('show'); document.body.style.overflow = 'hidden'; };
+  function showSet(){ renderSettings(); restoreFold(); $('settings').classList.add('show'); document.body.style.overflow = 'hidden'; }
+  $('openSet').onclick = showSet;
+  $('openData').onclick = function(){ showSet(); var d = document.querySelector('.set-sec[data-sec="data"]'); d.open = true; d.scrollIntoView({block:'center'}); };
   $('setX').onclick = closeSet; $('aboutX').onclick = closeAbout; $('aboutOk').onclick = closeAbout;
   $('edX').onclick = cancelEditor; $('edCancel').onclick = cancelEditor; $('edSave').onclick = saveEditor; $('edDel').onclick = deleteMemory;
   $('edRec').onclick = toggleRec; $('edMic').onclick = toggleMic;
@@ -644,7 +675,7 @@ function bind(){
   $('shLine').onclick = function(e){ if(!$('shText').value.trim()){ e.preventDefault(); toast('先寫下要傳的話'); return; } setTimeout(closeShare, 0); };
   $('shCopy').onclick = function(){ copy($('shText').value, '已複製，可以貼到 LINE'); closeShare(); };
   $('shOther').onclick = function(){ navigator.share({text:$('shText').value}).then(closeShare).catch(function(){}); };
-  $('exportBtn').onclick = exportBook; $('clearAll').onclick = clearAll;
+  $('exportBtn').onclick = exportBook; $('exportAll').onclick = exportAll; $('clearAll').onclick = clearAll;
   $('importFile').onchange = function(){ if(this.files[0]) importFile(this.files[0]); this.value = ''; };
   document.querySelectorAll('.set-sec').forEach(function(d){ d.addEventListener('toggle', saveFold); });
   $('foldOpen').onclick = function(){ document.querySelectorAll('.set-sec').forEach(function(d){ d.open = true; }); saveFold(); };

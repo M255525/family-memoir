@@ -11,7 +11,7 @@
 ## 資料
 - 文字：localStorage `fm_books`（`{cur, books[]}`）；設定 `fm_set`；首訪 `fm_warned`；今日撕頁數 `fm_tear`；未存草稿 `fm_draft`。
 - 照片（縮到長邊 1600 JPEG）、錄音：IndexedDB `family-memoir` 的 `media` store，回憶只存 id。`hydrate()` 把 `[data-media]` 換成 objectURL。
-- 備份 JSON：`{app:'family-memoir', v:1, book, media:{id:dataURL}}`。匯入同 id 的書用 `mergeList` 依 `updatedAt` 合併，刪除不同步。
+- 備份 JSON：單本 `{app:'family-memoir', v:1, book, media:{id:dataURL}}`；全部書 `{app:'family-memoir', v:2, books:[], media}`（不含裝置設定）。`importFile()` 兩種都收，同 id 的書用 `mergeList` 依 `updatedAt` 合併，刪除不同步；書名等書本欄位不合併；匯入時會移除沒寫過內容的預設空白書。入口是頁首 `#openData`（開設定並展開資料管理）。
 
 ## 成書排版（改動時注意）
 - `buildBook()` 在隱藏的 `#printBook` 以真實 A5 尺寸逐塊加入並量測溢出（直排看 scrollWidth、橫排看 scrollHeight），段落用二分搜尋切開、避開行首標點；預覽 `#spread` 是 clone＋`zoom`，列印直接印 `#printBook`。不要靠瀏覽器自動分頁，直排 block 在 Chrome 不會正常斷頁。
@@ -26,4 +26,5 @@
 - 傳給家人：`#shLine` 是真正的 `<a href="https://line.me/R/share?text=...">`，不要改回 `window.open`（主畫面模式容易被擋）。備份檔用 `navigator.share({files})`，`canShareFile()` 為真才顯示按鈕。
 
 ## 驗證紀錄（2026-11-04，Python Playwright）
+（2026-11-04 另驗 JSON：單本／全部匯出、新裝置還原＋重整後圖片仍在、重複匯入不增加、舊 v1 檔、5 種壞檔拒絕、空白預設書移除但有內容的保留、320～844 寬無溢出。）
 首訪警語、填主角（民國 37→1948）、撕日曆、回答存檔、範例載入、五分頁；直排／橫排 × 中／大字無頁面溢出；2,000 字以上長文跨頁無掉字；照片實際上傳；新增家人；匯出→刪書→匯入→重整後圖片仍在；PDF 24 頁 A5、封面底色有印出；360／375／414／768／1024 無水平捲動；無 console 錯誤。RWD 再驗 320（特大字）／360／414／568 橫／768／844 橫／1024／1440 × 5 分頁無溢出。麥克風錄音、語音輸入、實際開啟 LINE App、備份檔系統分享未用真實手機測。

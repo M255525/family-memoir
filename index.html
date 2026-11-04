@@ -413,6 +413,7 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
   <div class="bookpick">
     <label for="bookSel" style="position:absolute;left:-9999px">選擇回憶錄</label>
     <select id="bookSel"></select>
+    <button class="iconbtn" type="button" id="openData" aria-label="匯入或匯出 JSON 檔">💾<span class="lbl"> 匯入／匯出</span></button>
     <button class="iconbtn" type="button" id="openSet" aria-label="常用設定">⚙<span class="lbl"> 常用設定</span></button>
   </div>
 </header>
@@ -586,11 +587,12 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
     <details class="set-sec" data-sec="data">
       <summary><span class="sst">💾 資料管理</span><span class="ssv" id="ssData"></span></summary>
       <div class="set-body">
-        <p style="margin:0 0 10px;font-size:.9rem">備份檔會包含這本書的文字、照片和錄音。把檔案傳給家人匯入，相同的書會合併，不會互相蓋掉較新的內容。</p>
+        <p style="margin:0 0 10px;font-size:.9rem">JSON 檔會包含書裡的文字、照片和錄音。換裝置時用「匯出全部書」一次帶走；把檔案傳給家人匯入，相同的書會合併，不會互相蓋掉較新的內容。</p>
         <div class="row">
-          <button class="btn small" type="button" id="exportBtn">匯出這本書</button>
+          <button class="btn small" type="button" id="exportBtn">匯出這本書（JSON）</button>
+          <button class="btn small" type="button" id="exportAll">匯出全部書（JSON）</button>
           <button class="btn small line" type="button" id="shareBook" hidden>傳給家人（可選 LINE）</button>
-          <label class="btn small" style="margin:0">匯入備份檔<input id="importFile" type="file" accept=".json,application/json" hidden></label>
+          <label class="btn small" style="margin:0">匯入 JSON 檔<input id="importFile" type="file" accept=".json,application/json" hidden></label>
           <button class="btn small danger" type="button" id="clearAll">清除全部資料</button>
         </div>
       </div>
