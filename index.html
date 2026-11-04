@@ -38,6 +38,7 @@ a{color:var(--frame2)}
 @keyframes marquee-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
 .top{background:var(--frame);color:#fff;display:flex;align-items:center;gap:14px;padding:10px 20px;flex-wrap:wrap}
+.sm{display:none}
 .top h1{font-family:var(--kai);font-weight:700;font-size:1.5rem;margin:0;letter-spacing:.14em;white-space:nowrap}
 .top .bookpick{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0}
 .top select{background:#fff;color:var(--ink);border:0;border-radius:6px;padding:7px 8px;max-width:46vw;min-height:44px}
@@ -62,6 +63,10 @@ h2.vt{font-family:var(--kai);font-size:1.7rem;margin:0 0 4px;letter-spacing:.06e
 .btn.primary:hover{background:#9f1f17}
 .btn.small{min-height:40px;padding:0 12px;font-size:.88rem}
 .btn.danger{color:var(--red);border-color:var(--red)}
+.btn.line{background:#06a64a;border-color:#06a64a;color:#fff}
+.btn.line:hover{background:#058a3e}
+.sharebtns{display:flex;flex-direction:column;gap:10px}
+#shText{font-family:var(--kai);font-size:1.1rem;line-height:1.7}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 label.f{display:block;font-weight:500;font-size:.9rem;margin-bottom:12px}
@@ -80,7 +85,7 @@ label.f small{font-weight:400;color:var(--sub)}
 .cal-stack{position:relative;background:#ece9dc;padding-bottom:7px;border-radius:0 0 3px 3px;background-image:repeating-linear-gradient(0deg,#d9d5c4 0 1px,#f3f1e6 1px 3px);overflow:visible}
 .cal-sheet{background:var(--paper);padding:14px 26px 20px;text-align:center;position:relative;border-top:2px dotted #c9c4ae;min-height:520px;display:flex;flex-direction:column}
 .cal-meta{display:flex;justify-content:space-between;font-size:.84rem;color:var(--sub);gap:10px}
-.cal-day{font-family:"Abril Fatface",Georgia,serif;font-size:10rem;line-height:1;color:var(--frame2);margin:2px 0 0}
+.cal-day{font-family:"Abril Fatface",Georgia,serif;font-size:clamp(4.6rem,15vh,10rem);line-height:1;color:var(--frame2);margin:2px 0 0}
 .cal-day.rest{color:var(--red)}
 .cal-week{font-family:var(--kai);font-weight:700;letter-spacing:.3em;margin-right:-.3em;font-size:1.1rem}
 .cal-stage{margin-top:12px;font-size:.84rem;color:var(--red);font-weight:700;letter-spacing:.1em}
@@ -134,6 +139,7 @@ label.f small{font-weight:400;color:var(--sub)}
 .ty{display:grid;grid-template-columns:128px minmax(0,1fr);gap:18px;padding:14px 0;border-top:1px solid var(--line)}
 .ty .y{font-family:"Abril Fatface",Georgia,serif;font-size:2.1rem;line-height:1.05;color:var(--frame2)}
 .ty .y small{display:block;font-family:var(--ui);font-size:.8rem;color:var(--sub);margin-top:4px}
+.ty .y .ag{display:block}
 .ty .ev{color:var(--sub);font-size:.9rem;margin:0 0 6px}
 .ty .ev::before{content:"● ";color:var(--gold)}
 .tm{display:block;width:100%;background:var(--paper);border:0;text-align:left;padding:10px 14px;margin-bottom:8px;border-radius:3px;cursor:pointer;box-shadow:0 2px 5px rgba(30,60,50,.12)}
@@ -141,14 +147,25 @@ label.f small{font-weight:400;color:var(--sub)}
 .tm span{display:block;font-size:.9rem;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ===== 家族樹 ===== */
-.treebox{overflow:auto;background:var(--paper);border-radius:6px;padding:12px;box-shadow:inset 0 0 0 1px var(--line)}
+.treebar{display:flex;gap:6px;margin-bottom:8px;justify-content:flex-end}
+.treebar button{min-width:48px;min-height:44px;border:1.5px solid var(--frame);background:#fff;color:var(--frame2);border-radius:7px;font-weight:700;cursor:pointer}
+.plist{display:none;margin-top:16px}
+.plist h3{font-family:var(--kai);font-size:1.1rem;margin:12px 0 6px}
+.plist button{display:flex;justify-content:space-between;gap:10px;width:100%;min-height:52px;align-items:center;text-align:left;background:var(--paper);border:0;border-radius:4px;padding:8px 14px;margin-bottom:6px;cursor:pointer;box-shadow:0 1px 4px rgba(30,60,50,.14)}
+.plist b{font-family:var(--kai);font-size:1.1rem}
+.plist span{color:var(--sub);font-size:.84rem;text-align:right}
+.treebox{overflow:auto;-webkit-overflow-scrolling:touch;background:var(--paper);border-radius:6px;padding:12px;box-shadow:inset 0 0 0 1px var(--line)}
 .treebox svg{display:block}
 .tn{cursor:pointer}
 .tn:focus-visible rect{stroke:var(--gold);stroke-width:3}
 
 /* ===== 成書 ===== */
 .bookgrid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:26px;align-items:start}
-.bookform h3{font-family:var(--kai);font-size:1.2rem;margin:14px 0 8px}
+.bf{border-bottom:1px solid var(--line);margin-bottom:6px}
+.bf>summary{list-style:none;cursor:pointer;font-family:var(--kai);font-weight:700;font-size:1.2rem;display:flex;align-items:center;gap:8px;min-height:48px}
+.bf>summary::-webkit-details-marker{display:none}
+.bf>summary::before{content:"▸";color:var(--frame);transition:transform .15s}
+.bf[open]>summary::before{transform:rotate(90deg)}
 .chap{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line)}
 .chap input{flex:1;min-width:0;border:1px solid transparent;background:transparent;padding:6px;border-radius:5px;font-weight:500}
 .chap input:hover,.chap input:focus{border-color:var(--line);background:#fff}
@@ -157,11 +174,13 @@ label.f small{font-weight:400;color:var(--sub)}
 .chap button:disabled{opacity:.35}
 .spreadwrap{background:var(--frame2);border-radius:8px;padding:14px 12px;min-height:300px;overflow:hidden;position:sticky;top:64px}
 body.has-marquee .spreadwrap{top:94px}
+#spreadWrap{touch-action:pan-y}
 #spread{display:flex;justify-content:center;gap:0;margin:0 auto;width:max-content;max-width:none}
 #spread .bpage{box-shadow:0 4px 12px rgba(0,0,0,.35)}
 .bnav{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:12px;color:#fff;flex-wrap:wrap}
 .bnav .pg{min-width:7em;text-align:center}
 .bnav .btn{background:#fff}
+.bnav .btn.primary{background:var(--red);color:#fff;border-color:#fff}
 
 /* 書頁（預覽與列印共用，尺寸固定 A5） */
 .bpage{width:148mm;height:210mm;background:#fffefa;color:#1c1c1c;position:relative;overflow:hidden;flex:0 0 auto;font-family:var(--kai);font-size:var(--bfs,13.5pt);line-height:1.85;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -212,7 +231,7 @@ body.has-marquee .spreadwrap{top:94px}
 #printBook{position:absolute;left:-9999px;top:0;visibility:hidden}
 
 /* ===== 彈窗 ===== */
-.modal{position:fixed;inset:0;z-index:2200;background:rgba(20,40,34,.56);display:none;padding:20px;overflow:auto}
+.modal{position:fixed;inset:0;z-index:2200;background:rgba(20,40,34,.56);display:none;padding:20px;overflow:auto;overscroll-behavior:contain}
 .modal.show{display:block}
 .box{background:var(--paper);border-radius:10px;max-width:720px;margin:0 auto;padding:22px 24px}
 .box h2{font-family:var(--kai);font-size:1.4rem;margin:0 0 12px;display:flex;align-items:flex-start;gap:10px}
@@ -260,43 +279,116 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
 #toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:7px;z-index:2400;opacity:0;pointer-events:none;transition:opacity .2s;max-width:88vw;text-align:center}
 #toast.show{opacity:1}
 
+.top,.warnbar,nav.tabs,main,footer.site{padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
+@media(hover:none){
+  .btn:hover{background:#fff}
+  .btn.primary:hover{background:var(--red)}
+  .btn.line:hover{background:#06a64a}
+  .card:hover{box-shadow:0 3px 8px rgba(30,60,50,.16)}
+}
+@media(min-width:1400px){
+  main,footer.site{max-width:1280px}
+  .today{grid-template-columns:minmax(0,470px) minmax(0,1fr)}
+  .bookgrid{grid-template-columns:minmax(0,360px) minmax(0,1fr)}
+}
+/* 平板：今日一問維持兩欄，成書改成預覽在上 */
 @media(max-width:900px){
-  .today{grid-template-columns:minmax(0,1fr);gap:26px}
-  .calwrap{max-width:460px;margin:0 auto;width:100%}
-  .bookgrid{grid-template-columns:minmax(0,1fr)}
+  .today{grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:24px}
+  .bookgrid{grid-template-columns:minmax(0,1fr);gap:16px}
+  .bookprev{order:-1}
   .spreadwrap,body.has-marquee .spreadwrap{position:static}
   .filters{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .filters .search{grid-column:1/-1}
   .filters .btn{grid-column:1/-1}
+  .chap button{width:44px;height:44px}
 }
+@media(max-width:719px){
+  .today{grid-template-columns:minmax(0,1fr);gap:26px}
+  .calwrap{max-width:460px;margin:0 auto;width:100%}
+}
+/* 手機直向：分頁移到底部，儲存鈕黏在底部 */
 @media(max-width:640px){
-  .top{padding:8px 14px;flex-wrap:nowrap;gap:8px}
+  .lg{display:none}.sm{display:inline}
+  .top,.warnbar,main,footer.site{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
+  .top{padding-top:8px;padding-bottom:8px;flex-wrap:nowrap;gap:8px}
   .top h1{font-size:1.1rem;letter-spacing:.06em}
   .top select{max-width:none;width:100%;min-width:0}
-  .top .bookpick{flex:1 1 auto}
+  .top .bookpick{flex:1 1 auto;min-width:0}
   .iconbtn .lbl{display:none}
-  .bnav .pg{flex:1 1 100%;order:-1}
-  .warnbar{padding:4px 14px;font-size:.72rem}
-  main{padding:18px 14px 30px}
-  body{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
-  nav.tabs,body.has-marquee nav.tabs{position:fixed;top:auto;bottom:0;left:0;right:0;padding:0 0 env(safe-area-inset-bottom);gap:0;z-index:60}
-  nav.tabs button{flex:1 1 0;padding:8px 2px;font-size:.78rem;border-bottom:0;border-top:4px solid transparent;min-height:60px;min-width:0}
+  .warnbar{padding-top:4px;padding-bottom:4px;font-size:.76rem}
+  .warnbar button{margin-left:4px}
+  main{padding-top:16px;padding-bottom:26px}
+  h2.vt{font-size:1.45rem}
+  .lead{font-size:.92rem;margin-bottom:12px}
+  body{padding-bottom:calc(62px + env(safe-area-inset-bottom))}
+  nav.tabs,body.has-marquee nav.tabs{position:fixed;top:auto;bottom:0;left:0;right:0;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);gap:0;z-index:60}
+  nav.tabs button{flex:1 1 0;padding:8px 2px;font-size:1rem;border-bottom:0;border-top:4px solid transparent;min-height:58px;min-width:0}
   nav.tabs button.on{border-top-color:var(--gold)}
   .cal-sheet{min-height:0;padding:12px 16px 16px}
-  .cal-day{font-size:5.4rem}
   .calwrap{padding-top:18px}
+  .cal-head{letter-spacing:.12em}
   .cal-q{font-size:1.32rem;margin:2px 0 10px}
   .cal-stage{margin-top:6px}
-  .ty{grid-template-columns:minmax(0,1fr);gap:6px}
+  .ty{grid-template-columns:minmax(0,1fr);gap:4px;padding:10px 0}
+  .ty .y{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:1.7rem}
+  .ty .y small{margin:0}
+  .ty .y .ag{display:inline;margin-left:8px}
+  .plist{display:block}
   .grid2{grid-template-columns:minmax(0,1fr)}
+  .spreadwrap{padding:10px 8px}
+  .bnav{gap:8px}
+  .bnav .pg{flex:1 1 100%;order:-1}
+  .bnav .btn{flex:1 1 0;min-height:48px;padding:0 6px}
+  .bnav .btn.primary{flex:1 1 100%}
   .modal{padding:0}
-  .box{border-radius:0;min-height:100%;padding:16px 14px 28px}
+  .box{border-radius:0;min-height:100vh;min-height:100dvh;padding:14px 14px 0;max-width:none!important}
+  #settings .box,#about .box,#shareBox .box{padding-bottom:26px}
+  #edText{min-height:34vh}
+  .foot{position:sticky;bottom:0;background:var(--paper);padding:10px 0 calc(10px + env(safe-area-inset-bottom));margin-top:10px;border-top:1px solid var(--line);z-index:2}
+  .foot .right{flex:1 1 auto;margin-left:0}
+  .foot .right .btn{flex:1 1 0}
+  #editor .foot{flex-wrap:nowrap}
+  #editor .foot .btn{padding:0 10px}
   .set-sec>summary{flex-wrap:wrap}
   .set-sec .sst{flex:1 1 0}
   .set-sec>summary::after{order:2}
   .set-sec .ssv{flex:1 1 100%;order:3;margin-left:0;text-align:left;white-space:normal}
-  .foot .right{margin-left:0;width:100%}
-  .foot .right .btn{flex:1}
+  #toast{bottom:calc(74px + env(safe-area-inset-bottom))}
+}
+@media(max-width:420px){
+  .hs{display:none}
+}
+/* 手機橫向：高度只有 300–500px，日曆改左右排 */
+@media(max-height:520px) and (orientation:landscape){
+  .warnbar .lg{display:none}.warnbar .sm{display:inline}
+  .top{padding-top:3px;padding-bottom:3px}
+  .top h1{font-size:1.1rem}
+  .top select,.iconbtn{min-height:40px}
+  .warnbar{padding-top:1px;padding-bottom:1px;font-size:.72rem}
+  nav.tabs,body.has-marquee nav.tabs{position:static}
+  nav.tabs button{min-height:44px;padding-top:6px;padding-bottom:6px}
+  main{padding-top:12px}
+  .today{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px}
+  .calwrap{padding-top:0;max-width:none}
+  .nail{display:none}
+  .cal-head{padding:4px 10px;font-size:.88rem}
+  .cal-sheet{min-height:0;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"meta meta" "day stage" "day q" "week yj";column-gap:18px;padding:6px 14px 10px;text-align:left}
+  .cal-meta{grid-area:meta}.cal-day{grid-area:day;font-size:4.6rem;text-align:center}.cal-week{grid-area:week;text-align:center;letter-spacing:.1em;margin:0;font-size:.95rem}
+  .cal-stage{grid-area:stage;margin:0}.cal-q{grid-area:q;font-size:1.16rem;margin:0 0 4px;justify-content:flex-start}.cal-yj{grid-area:yj;padding-top:6px;font-size:.84rem}
+  .cal-act{margin-top:10px}
+  .cal-act .primary{min-height:48px;font-size:1rem}
+  #v-book>.vt,#v-book>.lead{display:none}
+  .spreadwrap,body.has-marquee .spreadwrap{position:static}
+  .bookgrid{grid-template-columns:minmax(0,1fr)}
+  .bookprev{order:-1}
+  .modal{padding:0}
+  .box{border-radius:0;max-width:none!important;min-height:100vh;min-height:100dvh}
+  #edText{min-height:120px}
+}
+@media(max-height:520px) and (orientation:landscape) and (max-width:640px){
+  nav.tabs,body.has-marquee nav.tabs{position:fixed}
+  nav.tabs button{min-height:46px}
+  body{padding-bottom:50px}
 }
 @media(prefers-reduced-motion:reduce){
   .tear{animation:none;display:none}
@@ -317,20 +409,20 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
 <div id="marqueeBar"><div id="marqueeTrack"></div></div>
 
 <header class="top">
-  <h1>家庭回憶錄</h1>
+  <h1><span class="hs">家庭</span>回憶錄</h1>
   <div class="bookpick">
     <label for="bookSel" style="position:absolute;left:-9999px">選擇回憶錄</label>
     <select id="bookSel"></select>
     <button class="iconbtn" type="button" id="openSet" aria-label="常用設定">⚙<span class="lbl"> 常用設定</span></button>
   </div>
 </header>
-<div class="warnbar">⚠ 回憶只存在這台裝置的瀏覽器，不會上傳；請定期匯出備份。<button type="button" data-open-about>使用警語</button></div>
+<div class="warnbar"><span class="lg">⚠ 回憶只存在這台裝置的瀏覽器，不會上傳；請定期匯出備份。</span><span class="sm">⚠ 資料只存在這台裝置，請定期備份。</span><button type="button" data-open-about>使用警語</button></div>
 
 <nav class="tabs" id="tabs" aria-label="分頁">
-  <button type="button" data-tab="today" class="on">今日一問</button>
-  <button type="button" data-tab="box">回憶盒</button>
-  <button type="button" data-tab="time">人生年表</button>
-  <button type="button" data-tab="tree">家族樹</button>
+  <button type="button" data-tab="today" class="on" aria-label="今日一問"><span class="lg">今日一問</span><span class="sm">今日</span></button>
+  <button type="button" data-tab="box" aria-label="回憶盒"><span class="lg">回憶盒</span><span class="sm">回憶</span></button>
+  <button type="button" data-tab="time" aria-label="人生年表"><span class="lg">人生年表</span><span class="sm">年表</span></button>
+  <button type="button" data-tab="tree" aria-label="家族樹"><span class="lg">家族樹</span><span class="sm">家族</span></button>
   <button type="button" data-tab="book">成書</button>
 </nav>
 
@@ -364,22 +456,27 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
     <p class="lead">回憶會依章節自動排版。預設是直排，由右往左翻，可到常用設定改成橫排。</p>
     <div class="bookgrid">
       <div class="bookform">
-        <label class="f">書名<input id="bTitle" maxlength="30"></label>
-        <label class="f">主角<input id="bSubject" maxlength="20"></label>
-        <label class="f">編者<input id="bEditor" maxlength="30" placeholder="例如：孫女 小晴"></label>
-        <label class="f">獻詞<textarea id="bDed" rows="2" maxlength="120"></textarea></label>
-        <label class="f">後記<textarea id="bAft" rows="3" maxlength="400"></textarea></label>
-        <h3>章節順序</h3>
-        <div id="chapList"></div>
-        <div class="row" style="margin-top:14px"><button class="btn primary" type="button" id="printBtn">列印／存成 PDF</button></div>
+        <details class="bf" id="bfInfo" open>
+          <summary>書名與獻詞</summary>
+          <label class="f">書名<input id="bTitle" maxlength="30"></label>
+          <label class="f">主角<input id="bSubject" maxlength="20"></label>
+          <label class="f">編者<input id="bEditor" maxlength="30" placeholder="例如：孫女 小晴"></label>
+          <label class="f">獻詞<textarea id="bDed" rows="2" maxlength="120"></textarea></label>
+          <label class="f">後記<textarea id="bAft" rows="3" maxlength="400"></textarea></label>
+        </details>
+        <details class="bf" id="bfChap" open>
+          <summary>章節順序</summary>
+          <div id="chapList"></div>
+        </details>
       </div>
-      <div>
+      <div class="bookprev">
         <div class="spreadwrap" id="spreadWrap">
           <div id="spreadZoom"><div id="spread"></div></div>
           <div class="bnav">
             <button class="btn small" type="button" id="navL"></button>
             <span class="pg" id="pgInfo" aria-live="polite"></span>
             <button class="btn small" type="button" id="navR"></button>
+            <button class="btn small primary" type="button" id="printBtn">列印／存成 PDF</button>
           </div>
         </div>
       </div>
@@ -447,6 +544,19 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
   </div>
 </div>
 
+<!-- 傳給家人 -->
+<div class="modal" id="shareBox" role="dialog" aria-modal="true" aria-labelledby="shH">
+  <div class="box" style="max-width:520px">
+    <h2 id="shH">傳給家人問<button class="x" type="button" id="shX" aria-label="關閉">✕</button></h2>
+    <label class="f">要傳的話 <small>可以先改成自己的口氣</small><textarea id="shText" rows="5"></textarea></label>
+    <div class="sharebtns">
+      <a class="btn line" id="shLine" href="https://line.me/R/share" target="_blank" rel="noopener">傳到 LINE</a>
+      <button class="btn" type="button" id="shCopy">複製文字</button>
+      <button class="btn" type="button" id="shOther" hidden>用其他 App 傳</button>
+    </div>
+  </div>
+</div>
+
 <!-- 常用設定 -->
 <div class="modal" id="settings" role="dialog" aria-modal="true" aria-labelledby="setH">
   <div class="box">
@@ -479,6 +589,7 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
         <p style="margin:0 0 10px;font-size:.9rem">備份檔會包含這本書的文字、照片和錄音。把檔案傳給家人匯入，相同的書會合併，不會互相蓋掉較新的內容。</p>
         <div class="row">
           <button class="btn small" type="button" id="exportBtn">匯出這本書</button>
+          <button class="btn small line" type="button" id="shareBook" hidden>傳給家人（可選 LINE）</button>
           <label class="btn small" style="margin:0">匯入備份檔<input id="importFile" type="file" accept=".json,application/json" hidden></label>
           <button class="btn small danger" type="button" id="clearAll">清除全部資料</button>
         </div>
@@ -504,7 +615,7 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
     <h3 style="margin:4px 0">⚠ 使用警語</h3>
     <ul class="clean">
       <li>文字、照片和錄音都<b>只存在這台裝置的瀏覽器</b>，不會上傳到本站。清除瀏覽器資料、換手機或換瀏覽器就會消失，請定期到「⚙ 常用設定 → 資料管理」匯出備份。</li>
-      <li>備份檔沒有加密，裡面有家人的真實故事與照片。傳給別人前，請先確認對方是你信任的家人。</li>
+      <li>備份檔沒有加密，裡面有家人的真實故事與照片。傳給別人前，請先確認對方是你信任的家人；用 LINE 傳送時請傳給個人或家人群組，不要傳到多人群組。</li>
       <li>「用說的輸入」使用瀏覽器內建的語音辨識，Chrome 等瀏覽器會把聲音送到它們的語音服務處理。不想送出時，請改用打字或「錄下聲音」（錄音只存在本機）。</li>
       <li>把故事貼到 ChatGPT 等 AI 服務潤稿，內容就會送到該服務。貼上前請先拿掉身分證字號、地址、病歷等敏感資料。</li>
       <li>記錄或印製家人的故事前，請先取得當事人同意。涉及其他人的隱私或爭議時，請斟酌是否收進書裡。</li>

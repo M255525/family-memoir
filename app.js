@@ -115,12 +115,12 @@ function renderToday(){
       qs.map(function(x){ return '<li><button type="button" data-q="' + x.id + '"' + (done[x.id] ? ' class="done"' : '') + '>' + esc(x.q) + '</button></li>'; }).join('') + '</ul></details>';
   }).join('');
   var setup = b.subject ? '' : '<div class="setup"><h3>這本回憶錄要寫誰？</h3><div class="grid2"><label class="f">主角的名字<input id="suName" maxlength="20" placeholder="例如：阿嬤 林春梅"></label><label class="f">出生年 <small>西元或民國</small><input id="suBirth" inputmode="numeric" maxlength="4"></label></div><div class="row"><button class="btn" type="button" id="suOk">開始</button><button class="btn" type="button" data-sample>先看虛構範例</button></div></div>';
-  $('v-today').innerHTML = '<div class="today"><div class="calwrap"><div class="nail"></div><div class="cal"><div class="cal-head">民國' + digitsCn(d.getFullYear() - 1911) + '年 ' + d.getFullYear() + '</div><div class="cal-stack" id="calStack"><div class="cal-sheet" id="calSheet">' + sheetHtml(q) + '</div></div></div>' +
+  $('v-today').innerHTML = setup + '<div class="today"><div class="calwrap"><div class="nail"></div><div class="cal"><div class="cal-head">民國' + digitsCn(d.getFullYear() - 1911) + '年 ' + d.getFullYear() + '</div><div class="cal-stack" id="calStack"><div class="cal-sheet" id="calSheet">' + sheetHtml(q) + '</div></div></div>' +
     '<div class="cal-act"><button class="btn primary" type="button" id="ansBtn">' + (q ? '回答這一題' : '寫一段回憶') + '</button><button class="btn" type="button" id="tearBtn"' + (q ? '' : ' disabled') + '>撕掉，換一題</button><button class="btn" type="button" id="shareQ"' + (q ? '' : ' disabled') + '>傳給家人問</button></div></div>' +
-    '<div class="side">' + setup + '<h2>' + esc(b.title) + '</h2><p class="progress">已經留下 ' + b.memories.length + ' 段回憶，回答了 ' + answered + ' 題。也可以從下面挑想問的題目。</p>' + stg + '</div></div>';
+    '<div class="side"><h2>' + esc(b.title) + '</h2><p class="progress">已經留下 ' + b.memories.length + ' 段回憶，回答了 ' + answered + ' 題。也可以從下面挑想問的題目。</p>' + stg + '</div></div>';
   $('ansBtn').onclick = function(){ var c = pickQ(); openEditor(null, c); };
   $('tearBtn').onclick = tear;
-  $('shareQ').onclick = function(){ var c = pickQ(); if(!c) return; var t = '想問您一件事：\n' + c.q; if(navigator.share){ navigator.share({text:t}).catch(function(){}); } else copy(t, '已複製，可以貼到 LINE'); };
+  $('shareQ').onclick = function(){ var c = pickQ(); if(c) openShare('想問您一件事：\n' + c.q + '\n\n您慢慢想，用說的也可以，我再幫您記進家裡的回憶錄。'); };
   if($('suOk')) $('suOk').onclick = function(){ var n = $('suName').value.trim(); if(!n){ toast('請先填主角的名字'); $('suName').focus(); return; } b.subject = n; b.birth = parseYear($('suBirth').value); if(b.title === '我們家的回憶錄') b.title = n + '的回憶錄'; save(); renderAll(); };
 }
 function tear(){
@@ -129,6 +129,9 @@ function tear(){
   lsSet(PREFIX + 'tear', JSON.stringify({d:todayKey(), n:tearCount() + 1}));
   sheet.innerHTML = sheetHtml(pickQ());
 }
+function openShare(t){ $('shText').value = t; lineHref(); $('shOther').hidden = !navigator.share; $('shareBox').classList.add('show'); document.body.style.overflow = 'hidden'; $('shLine').focus(); }
+function closeShare(){ $('shareBox').classList.remove('show'); document.body.style.overflow = ''; }
+function lineHref(){ $('shLine').href = 'https://line.me/R/share?text=' + encodeURIComponent($('shText').value.trim()); }
 function copy(t, msg){ function fb(){ var a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try{ document.execCommand('copy'); toast(msg); }catch(e){ toast('無法複製，請手動選取'); } a.remove(); } if(navigator.clipboard) navigator.clipboard.writeText(t).then(function(){ toast(msg); }, fb); else fb(); }
 
 /* ================= 寫回憶 ================= */
@@ -252,7 +255,7 @@ function renderTime(){
   if(showEv && lo) D.EVENTS.forEach(function(e){ if(e[0] >= lo){ (years[e[0]] = years[e[0]] || {m:[], e:[]}).e.push(e[1]); } });
   var h = Object.keys(years).map(Number).sort(function(a, c){ return a - c; }).map(function(y){
     var age = b.birth && y >= b.birth ? (y === b.birth ? '出生那年' : (b.subject || '主角') + ' ' + (y - b.birth) + ' 歲') : '';
-    return '<div class="ty"><div class="y">' + y + '<small>民國' + (y >= 1912 ? ' ' + (y - 1911) + ' 年' : '前') + (age ? '<br>' + esc(age) : '') + '</small></div><div>' +
+    return '<div class="ty"><div class="y">' + y + '<small>民國' + (y >= 1912 ? ' ' + (y - 1911) + ' 年' : '前') + (age ? '<span class="ag">' + esc(age) + '</span>' : '') + '</small></div><div>' +
       years[y].e.map(function(t){ return '<p class="ev">' + esc(t) + '</p>'; }).join('') +
       years[y].m.map(tmHtml).join('') + '</div></div>';
   }).join('');
@@ -306,7 +309,29 @@ function treeSvg(b, interactive){
   });
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + L.W + ' ' + L.H + '" width="' + L.W + '" height="' + L.H + '" role="img" aria-label="家族樹">' + s + '</svg>';
 }
-function renderTree(){ var b = book(); $('treeBox').innerHTML = b.people.length ? '<div class="treebox">' + treeSvg(b, true) + '</div>' : '<div class="empty"><p>先把主角加進來，再加上父母、配偶和孩子。</p></div>'; }
+var treeZ = 'fit';
+function renderTree(){
+  var b = book();
+  if(!b.people.length){ $('treeBox').innerHTML = '<div class="empty"><p>先把主角加進來，再加上父母、配偶和孩子。</p></div>'; return; }
+  var L = treeLayout(b), gens = {};
+  b.people.forEach(function(p){ (gens[L.y[p.id]] = gens[L.y[p.id]] || []).push(p); });
+  var list = Object.keys(gens).map(Number).sort(function(x, y){ return x - y; }).map(function(k, i){
+    return '<h3>第' + numCn(i + 1) + '代</h3>' + gens[k].map(function(p){ return '<button type="button" data-person="' + esc(p.id) + '"><b>' + esc(p.name) + '</b><span>' + esc([p.rel, (p.birth || '') + (p.death ? '–' + p.death : '')].filter(Boolean).join('・')) + '</span></button>'; }).join('');
+  }).join('');
+  $('treeBox').innerHTML = '<div class="treebar"><button type="button" data-tz="-" aria-label="縮小">－</button><button type="button" data-tz="fit">全圖</button><button type="button" data-tz="+" aria-label="放大">＋</button></div><div class="treebox" id="treeScroll">' + treeSvg(b, true) + '</div><div class="plist">' + list + '</div>';
+  fitTree();
+}
+function fitTree(){
+  var box = $('treeScroll'); if(!box) return;
+  var sv = box.querySelector('svg'), vb = sv.viewBox.baseVal, fit = Math.min(1, (box.clientWidth - 26) / vb.width);
+  var z = treeZ === 'fit' ? Math.max(fit, .42) : treeZ;
+  sv.style.width = Math.round(vb.width * z) + 'px'; sv.style.height = Math.round(vb.height * z) + 'px';
+  if(treeZ === 'fit') box.scrollLeft = (box.scrollWidth - box.clientWidth) / 2;
+}
+function zoomTree(c){
+  var box = $('treeScroll'), sv = box.querySelector('svg'), now = sv.getBoundingClientRect().width / sv.viewBox.baseVal.width;
+  treeZ = c === 'fit' ? 'fit' : Math.max(.42, Math.min(2, now * (c === '+' ? 1.25 : .8))); fitTree();
+}
 var pn = null;
 function openPerson(p){
   var b = book(); pn = p ? p.id : null;
@@ -341,7 +366,7 @@ function deletePerson(){
 }
 
 /* ================= 成書：實際量測分頁 ================= */
-var pages = [], spreadAt = 0, buildSeq = 0;
+var pages = [], spreadAt = 0, curPage = 0, buildSeq = 0;
 function vtext(t){ return set.dir === 'v' ? String(t).replace(/\d+/g, function(s){ return s.length >= 4 || s[0] === '0' ? digitsCn(s) : numCn(parseInt(s, 10)); }) : String(t); }
 function yearText(y){ return set.dir === 'v' ? digitsCn(y) : String(y); }
 function chapterList(b){ return b.order.map(function(id){ return {id:id, list:b.memories.filter(function(m){ return m.stage === id && m.include !== false; }).sort(byYear)}; }).filter(function(c){ return c.list.length; }); }
@@ -410,13 +435,13 @@ function buildBook(){
     return pages;
   });
 }
-function spreads(){ var one = window.innerWidth < 1000, a = []; if(!pages.length) return a; a.push([0]); for(var i = 1; i < pages.length; i += one ? 1 : 2) a.push(one || i + 1 >= pages.length ? [i] : [i, i + 1]); return a; }
+function spreads(){ var one = ($('spreadWrap').clientWidth - 24) / 1118.8 < .5, a = []; if(!pages.length) return a; a.push([0]); for(var i = 1; i < pages.length; i += one ? 1 : 2) a.push(one || i + 1 >= pages.length ? [i] : [i, i + 1]); return a; }
 function showSpread(){
   var sp = spreads(); if(!sp.length) return;
-  spreadAt = Math.max(0, Math.min(spreadAt, sp.length - 1));
+  spreadAt = sp.length - 1; sp.some(function(s, i){ if(s.indexOf(curPage) >= 0){ spreadAt = i; return true; } });
   var host = $('spread'), now = sp[spreadAt], order = set.dir === 'v' ? now.slice().reverse() : now;
   host.innerHTML = ''; order.forEach(function(i){ host.appendChild(pages[i].cloneNode(true)); });
-  var avail = $('spreadWrap').clientWidth - 24, full = now.length * 559.4, z = Math.min(1, avail / full, Math.max(.45, (window.innerHeight - 190) / 794));
+  var avail = $('spreadWrap').clientWidth - 24, full = now.length * 559.4, z = Math.min(1, avail / full, Math.max(.34, (window.innerHeight - 190) / 794));
   var zm = $('spreadZoom'); zm.style.zoom = z;
   var first = now[0] + 1, last = now[now.length - 1] + 1;
   $('pgInfo').textContent = (first === last ? '第 ' + first + ' 頁' : '第 ' + first + '–' + last + ' 頁') + '／共 ' + pages.length + ' 頁';
@@ -424,7 +449,7 @@ function showSpread(){
   $('navL').textContent = v ? '← 下一頁' : '← 上一頁'; $('navR').textContent = v ? '上一頁 →' : '下一頁 →';
   $('navL').disabled = v ? atEnd : atStart; $('navR').disabled = v ? atStart : atEnd;
 }
-function turn(d){ spreadAt += d; showSpread(); }
+function turn(d){ var sp = spreads(); if(!sp.length) return; var i = Math.max(0, Math.min(spreadAt + d, sp.length - 1)); curPage = sp[i][0]; showSpread(); }
 function renderBook(){
   var b = book();
   $('bTitle').value = b.title || ''; $('bSubject').value = b.subject || ''; $('bEditor').value = b.editor || ''; $('bDed').value = b.dedication || ''; $('bAft').value = b.afterword || '';
@@ -440,14 +465,28 @@ function renderChaps(){
 
 /* ================= 備份 ================= */
 function refsOf(b){ var a = []; b.memories.forEach(function(m){ a = a.concat(m.photos || [], m.audio || []); }); return a.filter(function(v, i, s){ return s.indexOf(v) === i; }); }
-function exportBook(){
-  var b = book(), media = {}; toast('正在打包，照片多時要等一下');
-  Promise.all(refsOf(b).map(function(id){ return getMedia(id).then(function(bl){ if(!bl) return; return b2d(bl).then(function(u){ media[id] = u; }); }); })).then(function(){
-    var blob = new Blob([JSON.stringify({app:'family-memoir', v:1, book:b, media:media})], {type:'application/json'}), a = document.createElement('a'), d = new Date();
-    a.href = URL.createObjectURL(blob); a.download = (b.title || '回憶錄').replace(/[\\/:*?"<>|]/g, '') + '-備份-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '.json';
-    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
-    set.lastExport[b.id] = Date.now(); saveSet(); renderSettings(); toast('已匯出備份檔');
+function packBook(){
+  var b = book(), media = {}, d = new Date();
+  return Promise.all(refsOf(b).map(function(id){ return getMedia(id).then(function(bl){ if(!bl) return; return b2d(bl).then(function(u){ media[id] = u; }); }); })).then(function(){
+    return {book:b, blob:new Blob([JSON.stringify({app:'family-memoir', v:1, book:b, media:media})], {type:'application/json'}), name:(b.title || '回憶錄').replace(/[\\/:*?"<>|]/g, '') + '-備份-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '.json'};
   });
+}
+function markBackup(b){ set.lastExport[b.id] = Date.now(); saveSet(); renderSettings(); }
+function exportBook(){
+  toast('正在打包，照片多時要等一下');
+  packBook().then(function(p){
+    var a = document.createElement('a'); a.href = URL.createObjectURL(p.blob); a.download = p.name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+    markBackup(p.book); toast('已匯出備份檔');
+  });
+}
+function canShareFile(){ try{ return !!(navigator.canShare && navigator.canShare({files:[new File(['x'], 'x.json', {type:'application/json'})]})); }catch(e){ return false; } }
+function shareBook(){
+  toast('正在打包，照片多時要等一下');
+  packBook().then(function(p){
+    var f = new File([p.blob], p.name, {type:'application/json'});
+    return navigator.share({files:[f], title:p.name}).then(function(){ markBackup(p.book); toast('已傳出備份檔'); });
+  }).catch(function(e){ if(!e || e.name !== 'AbortError') toast('這台裝置傳不出去，請改用「匯出這本書」'); });
 }
 function mergeList(oldL, newL){ var ix = {}; oldL.forEach(function(x){ ix[x.id] = x; }); var c = 0; newL.forEach(function(x){ var o = ix[x.id]; if(!o){ oldL.push(x); c++; } else if((x.updatedAt || 0) > (o.updatedAt || 0)){ Object.keys(x).forEach(function(k){ o[k] = x[k]; }); c++; } }); return c; }
 function importFile(f){
@@ -487,7 +526,7 @@ function renderSettings(){
   seg('segFs', set.fs); seg('segDir', set.dir); seg('segBfs', set.bfs); $('setEv').checked = !!set.ev;
   $('ssFs').textContent = {m:'標準', l:'大', xl:'特大'}[set.fs];
   $('ssLay').textContent = (set.dir === 'v' ? '直排' : '橫排') + '・' + {'12':'小', '13.5':'中', '15.5':'大'}[set.bfs] + '字';
-  $('ssShelf').textContent = S.books.length + ' 本';
+  $('ssShelf').textContent = S.books.length + ' 本'; $('shareBook').hidden = !canShareFile();
   var t = set.lastExport[S.cur]; $('ssData').textContent = t ? '上次備份 ' + new Date(t).toLocaleDateString('zh-TW') : '這本書還沒備份過';
   $('shelfList').innerHTML = S.books.map(function(b){ return '<div class="shelf"><b>' + esc(b.title) + (b.sample ? '（虛構範例）' : '') + '</b><span style="font-size:.84rem;color:var(--sub)">' + b.memories.length + ' 段</span><button class="btn small" type="button" data-open-book="' + esc(b.id) + '"' + (b.id === S.cur ? ' disabled' : '') + '>打開</button><button class="btn small danger" type="button" data-del-book="' + esc(b.id) + '">刪除</button></div>'; }).join('');
 }
@@ -541,8 +580,9 @@ function renderAll(){
 function bookField(id, key){ $(id).addEventListener('change', function(){ book()[key] = this.value.trim(); save(); renderAll(); }); }
 function bind(){
   document.addEventListener('click', function(e){
-    var t = e.target.closest('[data-tab],[data-q],[data-mem],[data-new],[data-sample],[data-person],[data-open-about],[data-delm],[data-up],[data-down],[data-open-book],[data-del-book]');
+    var t = e.target.closest('[data-tab],[data-q],[data-mem],[data-new],[data-sample],[data-person],[data-open-about],[data-delm],[data-up],[data-down],[data-open-book],[data-del-book],[data-tz]');
     if(!t) return;
+    if(t.hasAttribute('data-tz')){ zoomTree(t.getAttribute('data-tz')); return; }
     if(t.hasAttribute('data-open-about')){ openAbout(t.getAttribute('data-open-about')); return; }
     if(t.hasAttribute('data-tab')){ go(t.getAttribute('data-tab')); return; }
     if(t.hasAttribute('data-q')){ var b = book(), id = t.getAttribute('data-q'), m = b.memories.filter(function(x){ return x.qid === id; })[0]; openEditor(m || null, m ? null : qOf(id)); return; }
@@ -556,7 +596,7 @@ function bind(){
     if(t.hasAttribute('data-del-book')){ deleteBook(t.getAttribute('data-del-book')); }
   });
   document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape'){ if($('about').classList.contains('show')) closeAbout(); else if($('person').classList.contains('show')) closePerson(); else if($('settings').classList.contains('show')) closeSet(); else if(ed) cancelEditor(); return; }
+    if(e.key === 'Escape'){ if($('shareBox').classList.contains('show')) closeShare(); else if($('about').classList.contains('show')) closeAbout(); else if($('person').classList.contains('show')) closePerson(); else if($('settings').classList.contains('show')) closeSet(); else if(ed) cancelEditor(); return; }
     var n = e.target.closest && e.target.closest('.tn'); if(n && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); n.dispatchEvent(new MouseEvent('click', {bubbles:true})); return; }
     if(tab === 'book' && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) && !document.querySelector('.modal.show')){ if(e.key === 'ArrowLeft') turn(set.dir === 'v' ? 1 : -1); if(e.key === 'ArrowRight') turn(set.dir === 'v' ? -1 : 1); }
   });
@@ -577,12 +617,33 @@ function bind(){
   $('chapList').addEventListener('change', function(e){ var id = e.target.getAttribute('data-chap'); if(!id) return; var b = book(), v = e.target.value.trim(); if(v && v !== stageOf(id).n) b.chapterNames[id] = v; else delete b.chapterNames[id]; save(); renderBook(); });
   $('navL').onclick = function(){ turn(set.dir === 'v' ? 1 : -1); }; $('navR').onclick = function(){ turn(set.dir === 'v' ? -1 : 1); };
   $('printBtn').onclick = function(){ buildBook().then(function(r){ if(r){ showSpread(); window.print(); } }); };
-  window.addEventListener('resize', function(){ if(tab === 'book') showSpread(); });
+  var wide = window.innerWidth > 900, rz;
+  function foldBook(){ $('bfInfo').open = wide; $('bfChap').open = wide; }
+  foldBook();
+  window.addEventListener('resize', function(){
+    clearTimeout(rz);
+    rz = setTimeout(function(){
+      var w = window.innerWidth > 900; if(w !== wide){ wide = w; foldBook(); }
+      if(tab === 'book') showSpread(); else if(tab === 'tree') fitTree();
+    }, 120);
+  });
+  var tx = null;
+  $('spreadWrap').addEventListener('touchstart', function(e){ tx = e.touches.length === 1 ? [e.touches[0].clientX, e.touches[0].clientY] : null; }, {passive:true});
+  $('spreadWrap').addEventListener('touchend', function(e){
+    if(!tx) return; var t = e.changedTouches[0], dx = t.clientX - tx[0], dy = t.clientY - tx[1]; tx = null;
+    if(Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    turn(set.dir === 'v' ? (dx > 0 ? 1 : -1) : (dx < 0 ? 1 : -1));
+  }, {passive:true});
   function segBind(id, key){ $(id).addEventListener('click', function(e){ var v = e.target.getAttribute('data-v'); if(!v) return; set[key] = v; saveSet(); applySet(); renderSettings(); if(tab === 'book' && key !== 'fs') renderBook(); }); }
   segBind('segFs', 'fs'); segBind('segDir', 'dir'); segBind('segBfs', 'bfs');
   $('setEv').onchange = function(){ set.ev = this.checked; saveSet(); if(tab === 'book') renderBook(); };
   $('newBook').onclick = function(){ var t = prompt('新書的名字', '我們家的回憶錄'); if(t && t.trim()){ newBook(t.trim().slice(0, 30)); closeSet(); renderAll(); } };
   $('loadSample').onclick = function(){ closeSet(); loadSample(); };
+  $('shareBook').onclick = shareBook;
+  $('shX').onclick = closeShare; $('shText').addEventListener('input', lineHref);
+  $('shLine').onclick = function(e){ if(!$('shText').value.trim()){ e.preventDefault(); toast('先寫下要傳的話'); return; } setTimeout(closeShare, 0); };
+  $('shCopy').onclick = function(){ copy($('shText').value, '已複製，可以貼到 LINE'); closeShare(); };
+  $('shOther').onclick = function(){ navigator.share({text:$('shText').value}).then(closeShare).catch(function(){}); };
   $('exportBtn').onclick = exportBook; $('clearAll').onclick = clearAll;
   $('importFile').onchange = function(){ if(this.files[0]) importFile(this.files[0]); this.value = ''; };
   document.querySelectorAll('.set-sec').forEach(function(d){ d.addEventListener('toggle', saveFold); });
