@@ -50,7 +50,15 @@ var SAMPLE = {
     {id:'p5',name:'王志明',rel:'長子',birth:1970,father:'p4',mother:'p3',spouse:'p7'},
     {id:'p6',name:'王淑芬',rel:'女兒',birth:1973,father:'p4',mother:'p3'},
     {id:'p7',name:'張雅婷',rel:'媳婦',birth:1972,spouse:'p5'},
-    {id:'p8',name:'王子晴',rel:'孫女',birth:2001,father:'p5',mother:'p7'}
+    {id:'p8',name:'王子晴',rel:'孫女',birth:2001,father:'p5',mother:'p7'},
+    {id:'p9',name:'陳建宏',rel:'前女婿',birth:1970},
+    {id:'p10',name:'陳宥辰',rel:'外孫',birth:2000,father:'p9',mother:'p6'},
+    {id:'p11',name:'李國華',rel:'女婿',birth:1969},
+    {id:'p12',name:'李佳穎',rel:'外孫女',birth:1998,father:'p11',carers:[{id:'p6',kind:'step'}]}
+  ],
+  marriages:[
+    {id:'m_p6_p9',a:'p6',b:'p9',status:'divorced',from:1997,to:2006},
+    {id:'m_p11_p6',a:'p11',b:'p6',status:'married',from:2010}
   ],
   memories:[
     {qid:'root-0',stage:'root',year:1948,place:'嘉義鄉下',teller:'林春梅',who:['p1','p2'],text:'我是在稻埕邊那間土角厝出生的，產婆是隔壁的阿婆。聽我媽媽說，那天正在割稻，她是忙到肚子痛才回家。\n屋頂是稻草蓋的，下大雨時要拿臉盆接水，我們幾個孩子還比賽誰接得多。'},

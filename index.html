@@ -157,6 +157,14 @@ label.f small{font-weight:400;color:var(--sub)}
 .treebox{overflow:auto;-webkit-overflow-scrolling:touch;background:var(--paper);border-radius:6px;padding:12px;box-shadow:inset 0 0 0 1px var(--line)}
 .treebox svg{display:block}
 .tn{cursor:pointer}
+.relsec{border-top:1px solid var(--line);padding:10px 0 12px}
+.relsec h3{font-family:var(--kai);font-size:1.08rem;margin:0 0 8px}
+.relsec h3 small{font-weight:400;font-size:.82rem;color:var(--sub)}
+.mrow{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,.9fr) 46px;gap:8px;align-items:end;margin-bottom:10px}
+.mrow.c{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) 46px}
+.mrow label{display:block;font-size:.84rem;font-weight:500;min-width:0}
+.mrow select,.mrow input{display:block;width:100%;margin-top:3px;padding:8px;border:1.5px solid var(--line);border-radius:7px;background:#fff;font-size:1rem;min-height:46px}
+.rmv{height:46px;border:1.5px solid var(--line);background:#fff;border-radius:7px;color:var(--sub);cursor:pointer}
 .tn:focus-visible rect{stroke:var(--gold);stroke-width:3}
 
 /* ===== 成書 ===== */
@@ -335,6 +343,8 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
   .ty .y .ag{display:inline;margin-left:8px}
   .plist{display:block}
   .grid2{grid-template-columns:minmax(0,1fr)}
+  .mrow,.mrow.c{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .rmv{grid-column:1/-1}
   .spreadwrap{padding:10px 8px}
   .bnav{gap:8px}
   .bnav .pg{flex:1 1 100%;order:-1}
@@ -448,7 +458,7 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
   </section>
   <section class="view" id="v-tree">
     <h2 class="vt">家族樹</h2>
-    <p class="lead">把家人加進來，點一下名字可以修改。設定好父母和配偶，樹就會自己長出來。</p>
+    <p class="lead">把家人加進來，點一下名字可以修改。設定好父母和婚姻，樹就會自己長出來。</p>
     <div class="row" style="margin-bottom:14px"><button class="btn" type="button" id="addPerson">＋ 新增家人</button></div>
     <div id="treeBox"></div>
   </section>
@@ -464,6 +474,9 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
           <label class="f">編者<input id="bEditor" maxlength="30" placeholder="例如：孫女 小晴"></label>
           <label class="f">獻詞<textarea id="bDed" rows="2" maxlength="120"></textarea></label>
           <label class="f">後記<textarea id="bAft" rows="3" maxlength="400"></textarea></label>
+          <label class="f" id="bTreeExWrap" hidden>書裡的家族樹怎麼呈現離婚 <small>只影響書，家族樹分頁不變</small>
+            <select id="bTreeEx"><option value="show">完整畫出來</option><option value="note">不畫前任，只寫「曾有一段婚姻」</option><option value="hide">不畫，也不提</option></select>
+          </label>
         </details>
         <details class="bf" id="bfChap" open>
           <summary>章節順序</summary>
@@ -532,9 +545,18 @@ footer.site{max-width:1120px;margin:0 auto;padding:18px 20px 30px;font-size:.84r
       <label class="f">稱呼 <small>例如：阿公、長女</small><input id="pnRel" maxlength="12"></label>
       <label class="f">出生年 <small>西元或民國</small><input id="pnBirth" inputmode="numeric" maxlength="4"></label>
       <label class="f">過世年<input id="pnDeath" inputmode="numeric" maxlength="4"></label>
-      <label class="f">父親<select id="pnFather"></select></label>
-      <label class="f">母親<select id="pnMother"></select></label>
-      <label class="f">配偶<select id="pnSpouse"></select></label>
+      <label class="f">父親 <small>親生</small><select id="pnFather"></select></label>
+      <label class="f">母親 <small>親生</small><select id="pnMother"></select></label>
+    </div>
+    <div class="relsec">
+      <h3>婚姻 <small>離婚或喪偶後再婚，可以加第二段</small></h3>
+      <div id="pnMars"></div>
+      <button class="btn" type="button" id="pnAddMar">＋ 加一段婚姻</button>
+    </div>
+    <div class="relsec">
+      <h3>繼親與養親 <small>繼父母、養父母加在這裡</small></h3>
+      <div id="pnCars"></div>
+      <button class="btn" type="button" id="pnAddCar">＋ 加一位長輩</button>
     </div>
     <label class="f">備註<input id="pnNote" maxlength="60"></label>
     <div class="foot">

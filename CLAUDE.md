@@ -11,6 +11,7 @@
 ## 資料
 - 文字：localStorage `fm_books`（`{cur, books[]}`）；設定 `fm_set`；首訪 `fm_warned`；今日撕頁數 `fm_tear`；未存草稿 `fm_draft`。
 - 照片（縮到長邊 1600 JPEG）、錄音：IndexedDB `family-memoir` 的 `media` store，回憶只存 id。`hydrate()` 把 `[data-media]` 換成 objectURL。
+- 家族樹關係：`b.marriages`（`{id:pairId(a,b), a, b, status:married|divorced|widowed, from, to, updatedAt}`，同一對只留一筆，復合就改回在婚）；`p.father／p.mother` 只放親生父母，繼親與養親放 `p.carers`（`{id, kind:step|adopt}`）。舊的 `p.spouse` 由 `norm()`→`migrateSpouse()` 轉換後刪除，載入與匯入舊備份都會經過。`b.treeEx`（show／note／hide）只影響成書，規則在 `treeView()`：只拿掉沒有父母、也不是主角的那一方，再連帶拿掉只靠前任連著的人；雙方都留下時改畫 `none` 細線。
 - 備份 JSON：單本 `{app:'family-memoir', v:1, book, media:{id:dataURL}}`；全部書 `{app:'family-memoir', v:2, books:[], media}`（不含裝置設定）。`importFile()` 兩種都收，同 id 的書用 `mergeList` 依 `updatedAt` 合併，刪除不同步；書名等書本欄位不合併；匯入時會移除沒寫過內容的預設空白書。入口是頁首 `#openData`（開設定並展開資料管理）。
 
 ## 成書排版（改動時注意）
@@ -24,6 +25,9 @@
 - 雙頁或單頁看預覽區寬度（`spreads()` 縮放低於 .5 才單頁），不看視窗寬度；`curPage` 讓轉向後停在同一頁。手機左右滑翻頁，直排往右滑是下一頁。
 - 家族樹 `fitTree()` 預設縮到全圖（最小 .42 後置中捲動），`data-tz` 縮放；≤640 下方另有 `.plist` 世代清單。
 - 傳給家人：`#shLine` 是真正的 `<a href="https://line.me/R/share?text=...">`，不要改回 `window.open`（主畫面模式容易被擋）。備份檔用 `navigator.share({files})`，`canShareFile()` 為真才顯示按鈕。
+
+## 驗證紀錄（2026-11-06，家族樹婚姻／繼親）
+舊資料與舊備份轉換（含合併時不蓋掉離婚紀錄）、再婚保留前任、民國年換算、重複配偶與晚輩驗證、刪人連帶清理、成書三種模式、前任再婚家庭連帶隱藏、無婚姻紀錄的父母補細線、三段婚姻繞線、360 寬無溢出。家人很多時書裡方框字會跟著縮小（圖例和年份有放大），這點沒解決。
 
 ## 驗證紀錄（2026-11-04，Python Playwright）
 （2026-11-04 另驗 JSON：單本／全部匯出、新裝置還原＋重整後圖片仍在、重複匯入不增加、舊 v1 檔、5 種壞檔拒絕、空白預設書移除但有內容的保留、320～844 寬無溢出。）

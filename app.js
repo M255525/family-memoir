@@ -52,14 +52,26 @@ var S = {cur:null, books:[]}, set = {fs:'m', dir:'v', bfs:'13.5', ev:true, lastE
 function load(){
   try{ var s = JSON.parse(lsGet(PREFIX + 'books') || 'null'); if(s && s.books) S = s; }catch(e){}
   try{ var t = JSON.parse(lsGet(PREFIX + 'set') || 'null'); if(t) Object.keys(t).forEach(function(k){ set[k] = t[k]; }); }catch(e){}
+  S.books.forEach(norm);
   if(!S.books.length) newBook('我們家的回憶錄');
   if(!book()) S.cur = S.books[0].id;
 }
 function save(){ if(!lsSet(PREFIX + 'books', JSON.stringify(S))) toast('瀏覽器空間已滿，這次沒有存到。請先匯出備份'); }
 function saveSet(){ lsSet(PREFIX + 'set', JSON.stringify(set)); }
 function book(){ return S.books.filter(function(b){ return b.id === S.cur; })[0]; }
-function newBook(title){ var b = {id:uid('b'), title:title, subject:'', birth:null, editor:'', dedication:'', afterword:'', people:[], memories:[], order:D.STAGES.map(function(s){ return s.id; }), chapterNames:{}}; S.books.push(b); S.cur = b.id; save(); return b; }
-function norm(b){ b.people = b.people || []; b.memories = b.memories || []; b.chapterNames = b.chapterNames || {}; b.order = (b.order || []).filter(function(id){ return D.STAGES.some(function(s){ return s.id === id; }); }); D.STAGES.forEach(function(s){ if(b.order.indexOf(s.id) < 0) b.order.push(s.id); }); return b; }
+function newBook(title){ var b = {id:uid('b'), title:title, subject:'', birth:null, editor:'', dedication:'', afterword:'', people:[], marriages:[], memories:[], order:D.STAGES.map(function(s){ return s.id; }), chapterNames:{}}; S.books.push(b); S.cur = b.id; save(); return b; }
+function pairId(a, c){ return 'm_' + [a, c].sort().join('_'); }
+function marsOf(b, id){ return b.marriages.filter(function(m){ return m.a === id || m.b === id; }); }
+/* 舊資料的 p.spouse 在這裡轉成婚姻紀錄；舊備份匯入後也會經過這裡 */
+function migrateSpouse(b){
+  var has = {}, ids = {}; b.marriages.forEach(function(m){ has[m.id] = 1; }); b.people.forEach(function(p){ ids[p.id] = 1; });
+  b.people.forEach(function(p){
+    if(!('spouse' in p)) return;
+    if(p.spouse && ids[p.spouse] && p.spouse !== p.id){ var id = pairId(p.id, p.spouse); if(!has[id]){ has[id] = 1; b.marriages.push({id:id, a:p.id, b:p.spouse, status:'married', from:null, to:null}); } }
+    delete p.spouse;
+  });
+}
+function norm(b){ b.people = b.people || []; b.marriages = b.marriages || []; migrateSpouse(b); b.memories = b.memories || []; b.chapterNames = b.chapterNames || {}; b.order = (b.order || []).filter(function(id){ return D.STAGES.some(function(s){ return s.id === id; }); }); D.STAGES.forEach(function(s){ if(b.order.indexOf(s.id) < 0) b.order.push(s.id); }); return b; }
 function chapName(b, id){ return (b.chapterNames && b.chapterNames[id]) || stageOf(id).n; }
 function memTitle(m){ if(m.title) return m.title; var q = m.qid && qOf(m.qid); return q ? q.q : (m.text || '一段回憶').split('\n')[0].slice(0, 24); }
 function person(b, id){ return b.people.filter(function(p){ return p.id === id; })[0]; }
@@ -265,16 +277,71 @@ function renderTime(){
 function tmHtml(m){ return '<button class="tm" type="button" data-mem="' + esc(m.id) + '"><b>' + esc(memTitle(m)) + '</b><span>' + esc(m.text) + '</span></button>'; }
 
 /* ================= 家族樹 ================= */
-function treeLayout(b){
-  var P = b.people, g = {}, byId = {}, NW = 128, NH = 66, GX = 22, GY = 64, SP = 30;
-  P.forEach(function(p){ g[p.id] = 0; byId[p.id] = p; });
-  for(var it = 0; it < 40; it++){ P.forEach(function(p){ [p.father, p.mother].forEach(function(id){ if(byId[id] && g[p.id] < g[id] + 1) g[p.id] = g[id] + 1; }); if(byId[p.spouse] && g[p.id] < g[p.spouse]) g[p.id] = g[p.spouse]; }); }
+var LINE = {married:{w:2}, widowed:{w:2}, bio:{w:2}, divorced:{w:2, dash:'6 4'}, none:{w:1.5, dash:'2 4'}, step:{c:'#8a5a2b', w:2, dash:'7 5'}, adopt:{c:'#8a5a2b', w:2, dash:'10 4 2 4'}};
+var LINE_NAME = {married:'婚姻', widowed:'喪偶', divorced:'離婚', none:'孩子的父母', bio:'親生', step:'繼親', adopt:'收養'};
+function parentIds(p){ return [p.father, p.mother].concat((p.carers || []).map(function(k){ return k.id; })).filter(Boolean); }
+/* 算出這次要畫的人和線：畫面一律完整；成書依 b.treeEx（show／note／hide）處理離婚的那段 */
+function treeView(b, print){
+  var mode = print ? b.treeEx || 'show' : 'show', all = b.people, byId = {}, notes = {}, gone = {}, kept = [], anchor = null;
+  all.forEach(function(p){ byId[p.id] = p; });
+  var ms = (b.marriages || []).filter(function(m){ return byId[m.a] && byId[m.b]; }), M = ms;
+  if(mode !== 'show'){
+    anchor = all.filter(function(p){ return (b.subject && p.name === b.subject) || p.rel === '本人'; })[0] || null;
+    var rooted = function(p){ return p === anchor || parentIds(p).some(function(id){ return byId[id]; }); };
+    var other = function(p, m){ return ms.some(function(x){ return x !== m && x.status !== 'divorced' && (x.a === p.id || x.b === p.id); }); };
+    M = ms.filter(function(m){
+      if(m.status !== 'divorced') return true;
+      var A = byId[m.a], B = byId[m.b], ra = rooted(A), rb = rooted(B), drop = null;
+      if(ra !== rb) drop = ra ? B : A;
+      else if(!ra && other(A, m) !== other(B, m)) drop = other(A, m) ? B : A;
+      if(drop) gone[drop.id] = 1; else kept.push(m);
+      if(mode === 'note') [A, B].forEach(function(p){ if(p !== drop) notes[p.id] = (notes[p.id] || 0) + 1; });
+      return false;
+    });
+    M = M.filter(function(m){ return !gone[m.a] && !gone[m.b]; });
+  }
+  var P = all.filter(function(p){ return !gone[p.id]; });
+  if(Object.keys(gone).length){
+    /* 拿掉前任後，只靠前任連著的人（例如前任的再婚對象）也一起不畫 */
+    var group = function(list, pairs){ var r = {}; list.forEach(function(p){ r[p.id] = p.id; }); function f(i){ while(r[i] !== i) i = r[i] = r[r[i]]; return i; } pairs.forEach(function(e){ if(r[e[0]] != null && r[e[1]] != null) r[f(e[0])] = f(e[1]); }); var o = {}; list.forEach(function(p){ o[p.id] = f(p.id); }); return o; };
+    var links = function(ml){ var e = ml.map(function(m){ return [m.a, m.b]; }); all.forEach(function(p){ parentIds(p).forEach(function(id){ e.push([p.id, id]); }); }); return e; };
+    var whole = group(all, links(ms)), part = group(P, links(M.concat(kept))), size = {}, best = {};
+    P.forEach(function(p){ size[part[p.id]] = (size[part[p.id]] || 0) + 1; });
+    P.forEach(function(p){ var w = whole[p.id], c = part[p.id]; if(best[w] == null || size[c] > size[best[w]]) best[w] = c; });
+    if(anchor && part[anchor.id] != null) best[whole[anchor.id]] = part[anchor.id];
+    P = P.filter(function(p){ return best[whole[p.id]] === part[p.id]; });
+  }
+  var ids = {}; P.forEach(function(p){ ids[p.id] = p; });
+  M = M.filter(function(m){ return ids[m.a] && ids[m.b]; }).slice();
+  /* 父母都在、卻沒有婚姻紀錄：補一條細線，孩子才不會懸空 */
+  var pair = {}; M.forEach(function(m){ pair[pairId(m.a, m.b)] = 1; });
+  P.forEach(function(c){ if(ids[c.father] && ids[c.mother] && c.father !== c.mother && !pair[pairId(c.father, c.mother)]){ pair[pairId(c.father, c.mother)] = 1; M.push({a:c.father, b:c.mother, status:'none'}); } });
+  return {P:P, byId:ids, M:M, notes:notes, hasNote:P.some(function(p){ return notes[p.id]; })};
+}
+function treeLayout(b, print){
+  var V = treeView(b, print), P = V.P, byId = V.byId, g = {}, pt = {}, NW = 128, NH = V.hasNote ? 84 : 66, GX = 22, GY = 64, SP = 30;
+  function up(c){ var v = [c.father, c.mother].filter(function(id){ return byId[id]; }); return v.length ? v : (c.carers || []).map(function(k){ return k.id; }).filter(function(id){ return byId[id]; }); }
+  function link(a, c, m){ (pt[a] = pt[a] || []).push({id:c, m:m}); }
+  V.M.forEach(function(m){ link(m.a, m.b, m); link(m.b, m.a, m); });
+  Object.keys(pt).forEach(function(k){ pt[k].sort(function(p, q){ return (p.m.status === 'divorced' ? 0 : 1) - (q.m.status === 'divorced' ? 0 : 1) || (p.m.from || 9999) - (q.m.from || 9999); }); });
+  P.forEach(function(p){ g[p.id] = 0; });
+  for(var it = 0; it < 40; it++){ P.forEach(function(p){ parentIds(p).forEach(function(id){ if(byId[id] && g[p.id] < g[id] + 1) g[p.id] = g[id] + 1; }); (pt[p.id] || []).forEach(function(q){ if(g[p.id] < g[q.id]) g[p.id] = g[q.id]; }); }); }
   var rows = {}; P.forEach(function(p){ (rows[g[p.id]] = rows[g[p.id]] || []).push(p); });
   var gens = Object.keys(rows).map(Number).sort(function(a, c){ return a - c; }), x = {}, rowUnits = {};
   gens.forEach(function(k){
     var seen = {}, units = [];
-    rows[k].forEach(function(p){ if(seen[p.id]) return; seen[p.id] = 1; var s = byId[p.spouse], u = [p]; if(s && g[s.id] === k && !seen[s.id]){ seen[s.id] = 1; if(!p.father && !p.mother && (s.father || s.mother)) u = [p, s]; else u = [s, p]; } units.push(u); });
-    function want(u){ var v = []; u.forEach(function(p){ [p.father, p.mother].forEach(function(id){ if(x[id] != null) v.push(x[id] + NW / 2); }); }); return v.length ? v.reduce(function(a, c){ return a + c; }, 0) / v.length : null; }
+    function same(id){ return (pt[id] || []).filter(function(q){ return g[q.id] === k; }); }
+    rows[k].forEach(function(p){
+      if(seen[p.id]) return;
+      /* 同一世代、有婚姻或共同子女的人排成一組：第一段放左邊，其餘往右 */
+      var comp = [p.id], used = {}; used[p.id] = 1;
+      for(var i = 0; i < comp.length; i++) same(comp[i]).forEach(function(q){ if(!used[q.id]){ used[q.id] = 1; comp.push(q.id); } });
+      var root = comp.slice().sort(function(a, c){ return same(c).length - same(a).length || up(byId[c]).length - up(byId[a]).length || comp.indexOf(a) - comp.indexOf(c); })[0];
+      var left = [], right = [], done = {};
+      (function walk(id, side){ done[id] = 1; same(id).forEach(function(q, n){ if(done[q.id]) return; var sd = side || (n === 0 ? 'L' : 'R'); (sd === 'L' ? left : right).push(q.id); walk(q.id, sd); }); })(root, '');
+      units.push(left.reverse().concat([root], right).map(function(id){ seen[id] = 1; return byId[id]; }));
+    });
+    function want(u){ var v = []; u.forEach(function(p){ up(p).forEach(function(id){ if(x[id] != null) v.push(x[id] + NW / 2); }); }); return v.length ? v.reduce(function(a, c){ return a + c; }, 0) / v.length : null; }
     var idx = units.map(function(u, i){ var w = want(u); return {u:u, w:w == null ? 1e6 + i : w}; }).sort(function(a, c){ return a.w - c.w; });
     var cur = 0; rowUnits[k] = idx.map(function(o){ return o.u; });
     idx.forEach(function(o){ var uw = o.u.length * NW + (o.u.length - 1) * SP, st = o.w < 1e6 ? Math.max(cur, o.w - uw / 2) : cur; o.u.forEach(function(p, i){ x[p.id] = st + i * (NW + SP); }); cur = st + uw + GX; });
@@ -282,7 +349,7 @@ function treeLayout(b){
   gens.slice().reverse().forEach(function(k){
     var cur = 0;
     rowUnits[k].forEach(function(u){
-      var kids = P.filter(function(c){ return u.some(function(p){ return c.father === p.id || c.mother === p.id; }); });
+      var kids = P.filter(function(c){ return u.some(function(p){ return up(c).indexOf(p.id) >= 0; }); });
       var uw = u.length * NW + (u.length - 1) * SP, st = x[u[0].id];
       if(kids.length){ var c = kids.reduce(function(a, q){ return a + x[q.id] + NW / 2; }, 0) / kids.length; st = c - uw / 2; }
       st = Math.max(st, cur); u.forEach(function(p, i){ x[p.id] = st + i * (NW + SP); }); cur = st + uw + GX;
@@ -291,32 +358,82 @@ function treeLayout(b){
   var minX = Math.min.apply(null, P.map(function(p){ return x[p.id]; })), W = 0;
   P.forEach(function(p){ x[p.id] -= minX - 8; W = Math.max(W, x[p.id] + NW + 8); });
   var y = {}; gens.forEach(function(k, i){ rows[k].forEach(function(p){ y[p.id] = 8 + i * (NH + GY); }); });
-  return {x:x, y:y, W:W, H:gens.length * (NH + GY) - GY + 16, NW:NW, NH:NH, GY:GY, byId:byId};
+  return {x:x, y:y, W:W, H:gens.length * (NH + GY) - GY + 16, NW:NW, NH:NH, GY:GY, SP:SP, byId:byId, P:P, M:V.M, notes:V.notes};
+}
+function marText(m, names){
+  if(!m.from && !m.to) return '';
+  var end = m.status === 'divorced' ? '離婚' : '喪偶';
+  return names + '　' + [m.from ? m.from + ' 結婚' : '', m.to ? m.to + ' ' + end : '後' + end].filter(Boolean).join('，');
 }
 function treeSvg(b, interactive){
-  var L = treeLayout(b), s = '', C = '#2f6b5e', drawn = {};
-  b.people.forEach(function(p){ var q = L.byId[p.spouse]; if(q && L.y[q.id] === L.y[p.id] && !drawn[q.id]){ drawn[p.id] = 1; var l = Math.min(L.x[p.id], L.x[q.id]) + L.NW, r = Math.max(L.x[p.id], L.x[q.id]), yy = L.y[p.id] + L.NH / 2; s += '<path d="M' + l + ' ' + (yy - 3) + 'H' + r + 'M' + l + ' ' + (yy + 3) + 'H' + r + '" stroke="' + C + '" stroke-width="2"/>'; } });
-  b.people.forEach(function(c){
-    var ps = [c.father, c.mother].filter(function(id){ return L.byId[id]; }); if(!ps.length) return;
-    var px = ps.reduce(function(a, id){ return a + L.x[id] + L.NW / 2; }, 0) / ps.length, top = L.y[ps[0]] + (ps.length > 1 ? L.NH / 2 : L.NH), cy = L.y[c.id], cx = L.x[c.id] + L.NW / 2, mid = cy - L.GY / 2;
-    s += '<path d="M' + px + ' ' + top + 'V' + mid + 'H' + cx + 'V' + cy + '" fill="none" stroke="' + C + '" stroke-width="2"/>';
+  var L = treeLayout(b, !interactive), s = '', C = '#2f6b5e', pos = {}, brk = {}, lanes = {}, used = {};
+  function ln(d, st){ var a = LINE[st]; used[st] = 1; return '<path d="' + d + '" fill="none" stroke="' + (a.c || C) + '" stroke-width="' + a.w + '"' + (a.dash ? ' stroke-dasharray="' + a.dash + '"' : '') + '/>'; }
+  function cut(px, py){ return [-5, 5].map(function(o){ return '<path d="M' + (px + o - 3) + ' ' + (py + 7) + 'L' + (px + o + 3) + ' ' + (py - 7) + '" stroke="' + C + '" stroke-width="2"/>'; }).join(''); }
+  function flat(st, l, r, yy){ return (st === 'married' ? ln('M' + l + ' ' + (yy - 3) + 'H' + r, st) + ln('M' + l + ' ' + (yy + 3) + 'H' + r, st) : ln('M' + l + ' ' + yy + 'H' + r, st)) + (st === 'divorced' ? cut((l + r) / 2, yy) : ''); }
+  L.M.forEach(function(m){
+    if(L.y[m.a] !== L.y[m.b]) return;
+    var lo = Math.min(L.x[m.a], L.x[m.b]), hi = Math.max(L.x[m.a], L.x[m.b]), y0 = L.y[m.a], id = pairId(m.a, m.b);
+    if(hi - lo <= L.NW + L.SP + 1){ var l = lo + L.NW, yy = y0 + L.NH / 2; s += flat(m.status, l, hi, yy); pos[id] = {x:(l + hi) / 2, y:yy}; return; }
+    /* 中間隔著別人：從方框下緣繞過去 */
+    brk[y0] = (brk[y0] || 0) + 1;
+    var yb = y0 + L.NH, o = 6 + brk[y0] * 6, a = lo + L.NW / 2, c = hi + L.NW / 2;
+    if(m.status === 'married') s += ln('M' + (a - 3) + ' ' + yb + 'V' + (yb + o + 3) + 'H' + (c + 3) + 'V' + yb, 'married') + ln('M' + (a + 3) + ' ' + yb + 'V' + (yb + o - 3) + 'H' + (c - 3) + 'V' + yb, 'married');
+    else s += ln('M' + a + ' ' + yb + 'V' + (yb + o) + 'H' + c + 'V' + yb, m.status) + (m.status === 'divorced' ? cut((a + c) / 2, yb + o) : '');
+    pos[id] = {x:(a + c) / 2, y:yb + o};
   });
-  b.people.forEach(function(p){
-    var X = L.x[p.id], Y = L.y[p.id], yrs = (p.birth || '') + (p.death ? '–' + p.death : (p.birth ? '–' : ''));
+  function lane(cy){ lanes[cy] = (lanes[cy] || 0) + 1; return cy - L.GY / 2 + (lanes[cy] % 3 - 1) * 8; }
+  L.P.forEach(function(c){
+    var ps = [c.father, c.mother].filter(function(id){ return L.byId[id]; }), cy = L.y[c.id], cx = L.x[c.id] + L.NW / 2;
+    if(ps.length){
+      var at = ps.length > 1 && pos[pairId(ps[0], ps[1])];
+      var px = at ? at.x : ps.reduce(function(a, id){ return a + L.x[id] + L.NW / 2; }, 0) / ps.length, top = at ? at.y : L.y[ps[0]] + L.NH;
+      s += ln('M' + px + ' ' + top + 'V' + lane(cy) + 'H' + cx + 'V' + cy, 'bio');
+    }
+    var n = ps.length ? 1 : 0;
+    (c.carers || []).forEach(function(k){
+      if(!L.byId[k.id] || ps.indexOf(k.id) >= 0) return;
+      var ex = cx + n++ * 14, kx = L.x[k.id] + L.NW / 2 - 14;
+      s += ln('M' + kx + ' ' + (L.y[k.id] + L.NH) + 'V' + lane(cy) + 'H' + ex + 'V' + cy, k.kind === 'adopt' ? 'adopt' : 'step');
+    });
+  });
+  L.P.forEach(function(p){
+    var X = L.x[p.id], Y = L.y[p.id], yrs = (p.birth || '') + (p.death ? '–' + p.death : (p.birth ? '–' : '')), nt = L.notes[p.id];
     s += '<g' + (interactive ? ' class="tn" tabindex="0" role="button" aria-label="修改 ' + esc(p.name) + '" data-person="' + esc(p.id) + '"' : '') + '><rect x="' + X + '" y="' + Y + '" width="' + L.NW + '" height="' + L.NH + '" rx="5" fill="' + (p.death ? '#ece9dc' : '#fff') + '" stroke="' + C + '" stroke-width="1.5"/>' +
       '<text x="' + (X + L.NW / 2) + '" y="' + (Y + 26) + '" text-anchor="middle" font-size="18" font-weight="700" fill="#1f2b27" font-family="LXGW WenKai TC,serif">' + esc(p.name) + '</text>' +
-      '<text x="' + (X + L.NW / 2) + '" y="' + (Y + 49) + '" text-anchor="middle" font-size="12" fill="#4a5e56" font-family="Noto Sans TC,sans-serif">' + esc([p.rel, yrs].filter(Boolean).join('  ')) + '</text></g>';
+      '<text x="' + (X + L.NW / 2) + '" y="' + (Y + 49) + '" text-anchor="middle" font-size="12" fill="#4a5e56" font-family="Noto Sans TC,sans-serif">' + esc([p.rel, yrs].filter(Boolean).join('  ')) + '</text>' +
+      (nt ? '<text x="' + (X + L.NW / 2) + '" y="' + (Y + 71) + '" text-anchor="middle" font-size="12" fill="#4a5e56" font-family="Noto Sans TC,sans-serif">曾有' + (nt === 2 ? '兩' : numCn(nt)) + '段婚姻</text>' : '') + '</g>';
   });
-  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + L.W + ' ' + L.H + '" width="' + L.W + '" height="' + L.H + '" role="img" aria-label="家族樹">' + s + '</svg>';
+  /* 圖例和年份放在 SVG 裡，成書才印得出來；一般婚姻的家族樹不多這一塊 */
+  var fs = interactive ? 12 : Math.max(12, Math.round(L.W / 438 * 9)), k = fs / 12, H = L.H, tag = 'font-size="' + fs + '" fill="#4a5e56" font-family="Noto Sans TC,sans-serif"';
+  if(used.widowed || used.divorced || used.none || used.step || used.adopt){
+    var lx = 8, ly = H + 14 * k, keys = ['married', 'widowed', 'divorced', 'none', 'bio', 'step', 'adopt'].filter(function(c){ return used[c] && (c !== 'bio' || used.step || used.adopt); });
+    keys.forEach(function(c){
+      var w = (40 + LINE_NAME[c].length * 13 + 14) * k; if(lx > 8 && lx + w > L.W){ lx = 8; ly += 20 * k; }
+      s += flat(c, lx, lx + 30 * k, ly) + '<text x="' + (lx + 36 * k) + '" y="' + (ly + 4 * k) + '" ' + tag + '>' + LINE_NAME[c] + '</text>'; lx += w;
+    });
+    H = ly + 12 * k;
+    var per = Math.max(10, Math.floor((L.W - 16) / fs));
+    L.M.forEach(function(m){
+      if(m.status === 'married' || m.status === 'none') return;
+      var t = marText(m, L.byId[m.a].name + '、' + L.byId[m.b].name);
+      for(var i = 0; i < t.length; i += per){ H += 18 * k; s += '<text x="8" y="' + H + '" ' + tag + '>' + esc(t.slice(i, i + per)) + '</text>'; }
+    });
+    H = Math.ceil(H + 8 * k);
+  }
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + L.W + ' ' + H + '" width="' + L.W + '" height="' + H + '" role="img" aria-label="家族樹">' + s + '</svg>';
 }
 var treeZ = 'fit';
+function relTags(b, p){
+  var t = marsOf(b, p.id).map(function(m){ var q = person(b, m.a === p.id ? m.b : m.a); return q ? {married:'配偶', divorced:'離婚', widowed:'喪偶'}[m.status] + '：' + q.name : ''; });
+  return t.concat((p.carers || []).map(function(k){ var q = person(b, k.id); return q ? (k.kind === 'adopt' ? '養親' : '繼親') + '：' + q.name : ''; }));
+}
 function renderTree(){
   var b = book();
   if(!b.people.length){ $('treeBox').innerHTML = '<div class="empty"><p>先把主角加進來，再加上父母、配偶和孩子。</p></div>'; return; }
   var L = treeLayout(b), gens = {};
   b.people.forEach(function(p){ (gens[L.y[p.id]] = gens[L.y[p.id]] || []).push(p); });
   var list = Object.keys(gens).map(Number).sort(function(x, y){ return x - y; }).map(function(k, i){
-    return '<h3>第' + numCn(i + 1) + '代</h3>' + gens[k].map(function(p){ return '<button type="button" data-person="' + esc(p.id) + '"><b>' + esc(p.name) + '</b><span>' + esc([p.rel, (p.birth || '') + (p.death ? '–' + p.death : '')].filter(Boolean).join('・')) + '</span></button>'; }).join('');
+    return '<h3>第' + numCn(i + 1) + '代</h3>' + gens[k].map(function(p){ return '<button type="button" data-person="' + esc(p.id) + '"><b>' + esc(p.name) + '</b><span>' + esc([p.rel, (p.birth || '') + (p.death ? '–' + p.death : '')].concat(relTags(b, p)).filter(Boolean).join('・')) + '</span></button>'; }).join('');
   }).join('');
   $('treeBox').innerHTML = '<div class="treebar"><button type="button" data-tz="-" aria-label="縮小">－</button><button type="button" data-tz="fit">全圖</button><button type="button" data-tz="+" aria-label="放大">＋</button></div><div class="treebox" id="treeScroll">' + treeSvg(b, true) + '</div><div class="plist">' + list + '</div>';
   fitTree();
@@ -332,35 +449,73 @@ function zoomTree(c){
   var box = $('treeScroll'), sv = box.querySelector('svg'), now = sv.getBoundingClientRect().width / sv.viewBox.baseVal.width;
   treeZ = c === 'fit' ? 'fit' : Math.max(.42, Math.min(2, now * (c === '+' ? 1.25 : .8))); fitTree();
 }
-var pn = null;
+var pn = null, pnOpt = '';
+function relRow(box, html, vals){
+  var d = document.createElement('div'); d.className = 'mrow' + (box === 'pnCars' ? ' c' : ''); d.innerHTML = html;
+  Object.keys(vals).forEach(function(k){ d.querySelector('[data-k="' + k + '"]').value = vals[k] == null ? '' : vals[k]; });
+  d.querySelector('.rmv').onclick = function(){ d.parentNode.removeChild(d); };
+  $(box).appendChild(d);
+}
+function addMar(v){ v = v || {}; relRow('pnMars', '<label>配偶<select data-k="to">' + pnOpt + '</select></label><label>狀態<select data-k="status"><option value="married">在婚</option><option value="divorced">離婚</option><option value="widowed">喪偶</option></select></label><label>結婚年<input data-k="from" inputmode="numeric" maxlength="4"></label><label>結束年<input data-k="end" inputmode="numeric" maxlength="4"></label><button class="rmv" type="button" aria-label="移除這段婚姻">✕</button>', {to:v.to || '', status:v.status || 'married', from:v.from, end:v.end}); }
+function addCar(v){ v = v || {}; relRow('pnCars', '<label>長輩<select data-k="id">' + pnOpt + '</select></label><label>關係<select data-k="kind"><option value="step">繼親</option><option value="adopt">收養</option></select></label><button class="rmv" type="button" aria-label="移除這位長輩">✕</button>', {id:v.id || '', kind:v.kind || 'step'}); }
 function openPerson(p){
   var b = book(); pn = p ? p.id : null;
   $('pnHead').textContent = p ? '修改家人' : '新增家人';
   $('pnName').value = p ? p.name : ''; $('pnRel').value = p && p.rel || ''; $('pnBirth').value = p && p.birth || ''; $('pnDeath').value = p && p.death || ''; $('pnNote').value = p && p.note || '';
-  var others = b.people.filter(function(x){ return !p || x.id !== p.id; }), opt = '<option value="">（未設定）</option>' + others.map(function(x){ return '<option value="' + x.id + '">' + esc(x.name) + '</option>'; }).join('');
-  ['pnFather', 'pnMother', 'pnSpouse'].forEach(function(id){ $(id).innerHTML = opt; });
-  $('pnFather').value = p && p.father || ''; $('pnMother').value = p && p.mother || ''; $('pnSpouse').value = p && p.spouse || '';
+  var others = b.people.filter(function(x){ return !p || x.id !== p.id; }); pnOpt = '<option value="">（未設定）</option>' + others.map(function(x){ return '<option value="' + x.id + '">' + esc(x.name) + '</option>'; }).join('');
+  ['pnFather', 'pnMother'].forEach(function(id){ $(id).innerHTML = pnOpt; });
+  $('pnFather').value = p && p.father || ''; $('pnMother').value = p && p.mother || '';
+  $('pnMars').innerHTML = ''; $('pnCars').innerHTML = '';
+  if(p){ marsOf(b, p.id).forEach(function(m){ addMar({to:m.a === p.id ? m.b : m.a, status:m.status, from:m.from, end:m.to}); }); (p.carers || []).forEach(addCar); }
   $('pnDel').hidden = !p; $('pnMem').hidden = !p;
   $('person').classList.add('show'); document.body.style.overflow = 'hidden'; $('pnName').focus();
 }
 function closePerson(){ $('person').classList.remove('show'); document.body.style.overflow = ''; }
-function isAncestor(b, a, c, seen){ seen = seen || {}; if(!c || seen[c]) return false; seen[c] = 1; var p = person(b, c); if(!p) return false; return p.father === a || p.mother === a || isAncestor(b, a, p.father, seen) || isAncestor(b, a, p.mother, seen); }
+function isAncestor(b, a, c, seen){ seen = seen || {}; if(!c || seen[c]) return false; seen[c] = 1; var p = person(b, c); if(!p) return false; var ids = parentIds(p); return ids.indexOf(a) >= 0 || ids.some(function(id){ return isAncestor(b, a, id, seen); }); }
+function rowVals(box){ return [].map.call($(box).children, function(d){ var o = {}; [].forEach.call(d.querySelectorAll('[data-k]'), function(e){ o[e.getAttribute('data-k')] = e.value; }); return o; }); }
+function relProblem(b, fa, mo, mars, cars){
+  var seen = {}, i, r;
+  for(i = 0; i < mars.length; i++){
+    r = mars[i];
+    if(seen[r.to]) return '同一位配偶留一筆就好；復合的話把狀態改回在婚';
+    seen[r.to] = 1;
+    if(r.to === fa || r.to === mo || (pn && (isAncestor(b, pn, r.to) || isAncestor(b, r.to, pn)))) return '配偶不能同時是自己的長輩或晚輩，請重新選擇';
+    if(r.from && r.end && r.end < r.from) return '結束年不能早於結婚年';
+  }
+  seen = {};
+  for(i = 0; i < cars.length; i++){
+    r = cars[i];
+    if(seen[r.id] || r.id === fa || r.id === mo) return '同一位長輩不用重複填';
+    seen[r.id] = 1;
+    if(pn && isAncestor(b, pn, r.id)) return '繼親或養親不能是自己的晚輩，請重新選擇';
+  }
+  return '';
+}
 function savePerson(){
   var b = book(), name = $('pnName').value.trim();
   if(!name){ toast('請填姓名'); $('pnName').focus(); return; }
-  var id = pn || uid('p'), fa = $('pnFather').value, mo = $('pnMother').value, sp = $('pnSpouse').value;
+  var id = pn || uid('p'), fa = $('pnFather').value, mo = $('pnMother').value, now = Date.now();
   if(pn && (isAncestor(b, pn, fa) || isAncestor(b, pn, mo))){ toast('父母不能是自己的晚輩，請重新選擇'); return; }
+  var mars = rowVals('pnMars').filter(function(r){ return r.to; }).map(function(r){ return {to:r.to, status:r.status, from:parseYear(r.from), end:parseYear(r.end)}; });
+  var cars = rowVals('pnCars').filter(function(r){ return r.id; });
+  var bad = relProblem(b, fa, mo, mars, cars); if(bad){ toast(bad); return; }
   var p = person(b, id); if(!p){ p = {id:id}; b.people.push(p); }
-  var old = p.spouse;
-  p.name = name; p.rel = $('pnRel').value.trim(); p.birth = parseYear($('pnBirth').value); p.death = parseYear($('pnDeath').value); p.note = $('pnNote').value.trim(); p.father = fa; p.mother = mo; p.spouse = sp;
-  if(old && old !== sp){ var o = person(b, old); if(o && o.spouse === id) o.spouse = ''; }
-  if(sp){ var s = person(b, sp); if(s){ if(s.spouse && s.spouse !== id){ var o2 = person(b, s.spouse); if(o2) o2.spouse = ''; } s.spouse = id; } }
+  p.name = name; p.rel = $('pnRel').value.trim(); p.birth = parseYear($('pnBirth').value); p.death = parseYear($('pnDeath').value); p.note = $('pnNote').value.trim(); p.father = fa; p.mother = mo; p.carers = cars; p.updatedAt = now;
+  var keep = {}; mars.forEach(function(r){ keep[pairId(id, r.to)] = 1; });
+  b.marriages = b.marriages.filter(function(m){ return (m.a !== id && m.b !== id) || keep[m.id]; });
+  mars.forEach(function(r){
+    var mid = pairId(id, r.to), m = b.marriages.filter(function(x){ return x.id === mid; })[0];
+    if(!m){ m = {id:mid, a:id, b:r.to}; b.marriages.push(m); }
+    if(m.status !== r.status || m.from !== r.from || m.to !== r.end) m.updatedAt = now;
+    m.status = r.status; m.from = r.from; m.to = r.end;
+  });
   save(); closePerson(); renderAll(); toast('已儲存家人');
 }
 function deletePerson(){
   var b = book(), p = person(b, pn); if(!p || !confirm('確定要把「' + p.name + '」從家族樹移除？回憶內容不會刪除。')) return;
   b.people = b.people.filter(function(x){ return x !== p; });
-  b.people.forEach(function(x){ ['father', 'mother', 'spouse'].forEach(function(k){ if(x[k] === p.id) x[k] = ''; }); });
+  b.people.forEach(function(x){ ['father', 'mother'].forEach(function(k){ if(x[k] === p.id) x[k] = ''; }); x.carers = (x.carers || []).filter(function(k){ return k.id !== p.id; }); });
+  b.marriages = b.marriages.filter(function(m){ return m.a !== p.id && m.b !== p.id; });
   b.memories.forEach(function(m){ m.who = (m.who || []).filter(function(id){ return id !== p.id; }); });
   save(); closePerson(); renderAll(); toast('已移除家人');
 }
@@ -452,7 +607,7 @@ function showSpread(){
 function turn(d){ var sp = spreads(); if(!sp.length) return; var i = Math.max(0, Math.min(spreadAt + d, sp.length - 1)); curPage = sp[i][0]; showSpread(); }
 function renderBook(){
   var b = book();
-  $('bTitle').value = b.title || ''; $('bSubject').value = b.subject || ''; $('bEditor').value = b.editor || ''; $('bDed').value = b.dedication || ''; $('bAft').value = b.afterword || '';
+  $('bTitle').value = b.title || ''; $('bSubject').value = b.subject || ''; $('bEditor').value = b.editor || ''; $('bDed').value = b.dedication || ''; $('bAft').value = b.afterword || ''; $('bTreeEx').value = b.treeEx || 'show'; $('bTreeExWrap').hidden = !b.marriages.some(function(m){ return m.status === 'divorced'; });
   renderChaps(); return buildBook().then(function(r){ if(r) showSpread(); });
 }
 function renderChaps(){
@@ -522,7 +677,7 @@ function importFile(f){
       S.books = S.books.filter(function(b){ return !blankBook(b) || list.some(function(x){ return x.id === b.id; }); });
       list.forEach(function(nb){
         var have = S.books.filter(function(b){ return b.id === nb.id; })[0];
-        if(have){ norm(have); updated += mergeList(have.memories, nb.memories); mergeList(have.people, nb.people || []); merged++; last = have; }
+        if(have){ norm(have); updated += mergeList(have.memories, nb.memories); mergeList(have.people, nb.people || []); mergeList(have.marriages, nb.marriages || []); norm(have); merged++; last = have; }
         else { S.books.push(norm(nb)); added++; last = nb; }
       });
       if(list.length === 1 || !book()) S.cur = last.id;
@@ -641,10 +796,10 @@ function bind(){
   $('edAi').onclick = function(){ var t = $('edText').value.trim(); if(!t){ toast('先寫下一些內容，才能複製提示詞'); return; } var q = $('edQ').hidden ? '' : '問題：' + $('edQ').textContent + '\n'; copy('請把下面的口述整理成通順的第一人稱段落。保留原本的用詞、口氣和台語說法。不要加入原文沒有的事實、日期或情緒，也不要美化。看不懂的地方用（？）標示，不要猜。\n\n' + q + '口述：\n' + t, '已複製提示詞，貼到 AI 前請拿掉敏感資料'); };
   $('pnX').onclick = closePerson; $('pnCancel').onclick = closePerson; $('pnSave').onclick = savePerson; $('pnDel').onclick = deletePerson;
   $('pnMem').onclick = function(){ var id = pn; closePerson(); go('box'); $('fp').value = id; renderBox(); };
-  $('addPerson').onclick = function(){ openPerson(null); };
+  $('addPerson').onclick = function(){ openPerson(null); }; $('pnAddMar').onclick = function(){ addMar(); }; $('pnAddCar').onclick = function(){ addCar(); };
   ['fq', 'fs', 'fp'].forEach(function(id){ $(id).addEventListener('input', renderBox); });
   $('tlEv').onchange = function(){ set.tlEv = this.checked; saveSet(); renderTime(); };
-  bookField('bTitle', 'title'); bookField('bSubject', 'subject'); bookField('bEditor', 'editor'); bookField('bDed', 'dedication'); bookField('bAft', 'afterword');
+  bookField('bTitle', 'title'); bookField('bSubject', 'subject'); bookField('bEditor', 'editor'); bookField('bDed', 'dedication'); bookField('bAft', 'afterword'); bookField('bTreeEx', 'treeEx');
   $('chapList').addEventListener('change', function(e){ var id = e.target.getAttribute('data-chap'); if(!id) return; var b = book(), v = e.target.value.trim(); if(v && v !== stageOf(id).n) b.chapterNames[id] = v; else delete b.chapterNames[id]; save(); renderBook(); });
   $('navL').onclick = function(){ turn(set.dir === 'v' ? 1 : -1); }; $('navR').onclick = function(){ turn(set.dir === 'v' ? -1 : 1); };
   $('printBtn').onclick = function(){ buildBook().then(function(r){ if(r){ showSpread(); window.print(); } }); };
@@ -684,5 +839,5 @@ function bind(){
 
 load(); applySet(); bind(); renderAll(); initMarquee(); initPwa();
 if(lsGet(WARN_KEY) !== '1') openAbout();
-window._fm = {S:function(){ return S; }, go:go, loadSample:loadSample, buildBook:buildBook, pages:function(){ return pages; }, set:set, treeLayout:treeLayout, parseYear:parseYear, numCn:numCn, vtext:vtext};
+window._fm = {S:function(){ return S; }, go:go, loadSample:loadSample, buildBook:buildBook, pages:function(){ return pages; }, set:set, treeLayout:treeLayout, treeSvg:treeSvg, parseYear:parseYear, numCn:numCn, vtext:vtext};
 })();
